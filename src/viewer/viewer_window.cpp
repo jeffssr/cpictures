@@ -2,6 +2,8 @@
 
 #include <exception>
 
+#include "cpictures/overlay.h"
+
 namespace cpictures {
 namespace {
 
@@ -16,14 +18,6 @@ int ViewerWindow::CreateAndShow(const std::filesystem::path& path) {
     imageList_ = ImageList::LoadFromFile(path);
     if (imageList_.Empty()) {
         MessageBoxW(nullptr, L"cpictures: no image found.", L"cpictures", MB_OK | MB_ICONINFORMATION);
-        return 1;
-    }
-
-    const auto currentPath = imageList_.Current();
-    try {
-        decoder_.Decode(currentPath);
-    } catch (const std::exception&) {
-        MessageBoxW(nullptr, L"cpictures: failed to open image.", L"cpictures", MB_OK | MB_ICONERROR);
         return 1;
     }
 
@@ -62,6 +56,7 @@ int ViewerWindow::CreateAndShow(const std::filesystem::path& path) {
         return 1;
     }
 
+    LoadCurrentImage();
     ShowWindow(hwnd_, showCommand_);
     UpdateWindow(hwnd_);
 
@@ -106,12 +101,17 @@ LRESULT ViewerWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) 
         break;
     case WM_ERASEBKGND:
         return 1;
+    case WM_LBUTTONUP:
+        viewState_.overlayVisible = !viewState_.overlayVisible;
+        InvalidateRect(hwnd_, nullptr, FALSE);
+        return 0;
+    case WM_SIZE:
+        renderer_.Resize(hwnd_);
+        return 0;
     case WM_PAINT: {
         PAINTSTRUCT ps{};
-        HDC dc = BeginPaint(hwnd_, &ps);
-        RECT client{};
-        GetClientRect(hwnd_, &client);
-        FillRect(dc, &client, reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1));
+        BeginPaint(hwnd_, &ps);
+        renderer_.Render(hwnd_, viewState_, OverlayText());
         EndPaint(hwnd_, &ps);
         return 0;
     }
@@ -130,6 +130,51 @@ void ViewerWindow::Close() {
         DestroyWindow(hwnd_);
         hwnd_ = nullptr;
     }
+}
+
+void ViewerWindow::LoadCurrentImage() {
+    decoded_ = decoder_.Decode(imageList_.Current());
+
+    const SizeI targetSize = FitImageWindow(decoded_.size, WorkAreaForWindow());
+    SetWindowPos(hwnd_, nullptr, 0, 0, targetSize.width, targetSize.height, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+
+    RECT client{};
+    GetClientRect(hwnd_, &client);
+    const int clientWidth = client.right - client.left;
+    const int clientHeight = client.bottom - client.top;
+    if (clientWidth != targetSize.width || clientHeight != targetSize.height) {
+        const int correctedWidth = targetSize.width + (targetSize.width - clientWidth);
+        const int correctedHeight = targetSize.height + (targetSize.height - clientHeight);
+        SetWindowPos(hwnd_, nullptr, 0, 0, correctedWidth, correctedHeight, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+        GetClientRect(hwnd_, &client);
+    }
+
+    HMONITOR monitor = MonitorFromWindow(hwnd_, MONITOR_DEFAULTTONEAREST);
+    MONITORINFO info{sizeof(info)};
+    GetMonitorInfoW(monitor, &info);
+
+    const int finalWidth = client.right - client.left;
+    const int finalHeight = client.bottom - client.top;
+    const int x = info.rcWork.left + ((info.rcWork.right - info.rcWork.left) - finalWidth) / 2;
+    const int y = info.rcWork.top + ((info.rcWork.bottom - info.rcWork.top) - finalHeight) / 2;
+    SetWindowPos(hwnd_, nullptr, x, y, finalWidth, finalHeight, SWP_NOZORDER | SWP_NOACTIVATE);
+
+    renderer_.EnsureDevice(hwnd_);
+    renderer_.SetImage(decoded_);
+}
+
+SizeI ViewerWindow::WorkAreaForWindow() const {
+    HMONITOR monitor = MonitorFromWindow(hwnd_, MONITOR_DEFAULTTONEAREST);
+    MONITORINFO info{sizeof(info)};
+    GetMonitorInfoW(monitor, &info);
+    return {info.rcWork.right - info.rcWork.left, info.rcWork.bottom - info.rcWork.top};
+}
+
+std::wstring ViewerWindow::OverlayText() const {
+    return BuildOverlayText(
+        imageList_.Current().filename().wstring(),
+        static_cast<int>(imageList_.Index()),
+        static_cast<int>(imageList_.Count()));
 }
 
 }  // namespace cpictures
