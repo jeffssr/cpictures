@@ -262,7 +262,17 @@ void ViewerWindow::LoadCurrentImage() {
         decoded_ = decoder_.Decode(imageList_.Current());
     }
 
-    const SizeI targetSize = FitImageWindow(decoded_.size, WorkAreaForWindow());
+    ResizeWindowToClientSize(FitImageWindow(decoded_.size, WorkAreaForWindow()));
+    renderer_.EnsureDevice(hwnd_);
+    renderer_.SetImage(decoded_);
+    WarmPrefetch();
+}
+
+void ViewerWindow::ResizeWindowToClientSize(SizeI targetSize) {
+    if (!IsValid(targetSize)) {
+        return;
+    }
+
     SetWindowPos(hwnd_, nullptr, 0, 0, targetSize.width, targetSize.height, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
 
     RECT client{};
@@ -285,10 +295,6 @@ void ViewerWindow::LoadCurrentImage() {
     const int x = info.rcWork.left + ((info.rcWork.right - info.rcWork.left) - finalWidth) / 2;
     const int y = info.rcWork.top + ((info.rcWork.bottom - info.rcWork.top) - finalHeight) / 2;
     SetWindowPos(hwnd_, nullptr, x, y, finalWidth, finalHeight, SWP_NOZORDER | SWP_NOACTIVATE);
-
-    renderer_.EnsureDevice(hwnd_);
-    renderer_.SetImage(decoded_);
-    WarmPrefetch();
 }
 
 void ViewerWindow::WarmPrefetch() {
@@ -338,7 +344,7 @@ void ViewerWindow::SetFitToScreen() {
     }
 
     const SizeI work = WorkAreaForWindow();
-    const SizeI fit = FitImageWindow(decoded_.size, work);
+    const SizeI fit = ScaleImageToFitWorkArea(decoded_.size, work);
     if (!IsValid(fit)) {
         viewState_.fitMode = FitMode::ActualSize;
         viewState_.zoom = 1.0;
@@ -347,6 +353,7 @@ void ViewerWindow::SetFitToScreen() {
 
     viewState_.fitMode = FitMode::FitToScreen;
     viewState_.zoom = static_cast<double>(fit.width) / static_cast<double>(decoded_.size.width);
+    ResizeWindowToClientSize(fit);
 }
 
 void ViewerWindow::ToggleFullscreen() {

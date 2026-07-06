@@ -50,6 +50,10 @@ void TestFitWindow() {
     const cpictures::SizeI exact = cpictures::FitImageWindow(small, work);
     Expect(exact.width == 640, "small image remains 100 percent width");
     Expect(exact.height == 480, "small image remains 100 percent height");
+
+    const cpictures::SizeI fitSmall = cpictures::ScaleImageToFitWorkArea(small, work);
+    Expect(fitSmall.width == 1440, "fit-to-screen upscales small image width");
+    Expect(fitSmall.height == 1080, "fit-to-screen upscales small image height");
 }
 
 void WriteTinyFile(const std::filesystem::path& path) {
