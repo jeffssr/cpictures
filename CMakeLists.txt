@@ -21,6 +21,17 @@ if(MSVC)
   target_compile_options(cpictures_core PRIVATE /FS)
 endif()
 
+add_executable(cpictures WIN32
+  src/main.cpp
+  src/app/app.cpp
+  src/image/wic_decoder.cpp
+  src/viewer/viewer_window.cpp
+)
+target_compile_features(cpictures PRIVATE cxx_std_20)
+target_include_directories(cpictures PRIVATE include src)
+target_compile_definitions(cpictures PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_link_libraries(cpictures PRIVATE cpictures_core windowscodecs ole32 shell32 user32 gdi32)
+
 include(CTest)
 if(BUILD_TESTING AND CPICTURES_BUILD_TESTS)
   add_executable(cpictures_core_tests tests/core_tests.cpp)
