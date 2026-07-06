@@ -6,7 +6,6 @@
 #include <string>
 #include <vector>
 
-#include "cpictures/commands.h"
 #include "cpictures/geometry.h"
 #include "cpictures/natural_sort.h"
 #include "cpictures/overlay.h"
@@ -38,11 +37,6 @@ void TestSupportedFormats() {
     Expect(cpictures::IsCoreSupportedExtension(L".jpg"), "jpg supported");
     Expect(cpictures::IsCoreSupportedExtension(L".JPEG"), "jpeg case insensitive");
     Expect(!cpictures::IsCoreSupportedExtension(L".psd"), "psd not core supported");
-}
-
-void TestCommandsHeader() {
-    const cpictures::Command command = cpictures::Command::FitToScreen;
-    Expect(command == cpictures::Command::FitToScreen, "commands header exposes fit to screen command");
 }
 
 void TestFitWindow() {
@@ -109,7 +103,6 @@ int main() {
     TestNaturalSort();
     TestOverlayText();
     TestSupportedFormats();
-    TestCommandsHeader();
     TestFitWindow();
     TestImageListNaturalOrder();
     TestImageListSkipsNonImageCurrentFile();

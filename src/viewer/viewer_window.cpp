@@ -126,6 +126,14 @@ LRESULT ViewerWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) 
             ExecuteCommand(Command::ToggleFullscreen);
             return 0;
         }
+        if (wparam == VK_OEM_PLUS || wparam == VK_ADD) {
+            ExecuteCommand(Command::ZoomIn);
+            return 0;
+        }
+        if (wparam == VK_OEM_MINUS || wparam == VK_SUBTRACT) {
+            ExecuteCommand(Command::ZoomOut);
+            return 0;
+        }
         if ((GetKeyState(VK_CONTROL) & 0x8000) != 0) {
             if (wparam == L'L') {
                 ExecuteCommand(Command::RotateLeft);
@@ -275,14 +283,22 @@ void ViewerWindow::SetActualSize() {
 }
 
 void ViewerWindow::SetFitToScreen() {
-    viewState_.fitMode = FitMode::FitToScreen;
+    if (!IsValid(decoded_.size)) {
+        viewState_.fitMode = FitMode::ActualSize;
+        viewState_.zoom = 1.0;
+        return;
+    }
+
     const SizeI work = WorkAreaForWindow();
     const SizeI fit = FitImageWindow(decoded_.size, work);
-    if (decoded_.size.width > 0) {
-        viewState_.zoom = static_cast<double>(fit.width) / static_cast<double>(decoded_.size.width);
-    } else {
+    if (!IsValid(fit)) {
+        viewState_.fitMode = FitMode::ActualSize;
         viewState_.zoom = 1.0;
+        return;
     }
+
+    viewState_.fitMode = FitMode::FitToScreen;
+    viewState_.zoom = static_cast<double>(fit.width) / static_cast<double>(decoded_.size.width);
 }
 
 void ViewerWindow::ToggleFullscreen() {
