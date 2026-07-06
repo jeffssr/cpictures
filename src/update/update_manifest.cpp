@@ -34,6 +34,22 @@ bool ConsumeLiteral(const std::wstring& text, size_t* pos, const wchar_t* litera
     return true;
 }
 
+bool ParseHexDigit(wchar_t ch, unsigned int* value) {
+    if (ch >= L'0' && ch <= L'9') {
+        *value = static_cast<unsigned int>(ch - L'0');
+        return true;
+    }
+    if (ch >= L'a' && ch <= L'f') {
+        *value = static_cast<unsigned int>(ch - L'a' + 10);
+        return true;
+    }
+    if (ch >= L'A' && ch <= L'F') {
+        *value = static_cast<unsigned int>(ch - L'A' + 10);
+        return true;
+    }
+    return false;
+}
+
 bool ParseString(const std::wstring& text, size_t* pos, std::wstring* out) {
     SkipWhitespace(text, pos);
     if (*pos >= text.size() || text[*pos] != L'"') {
@@ -76,6 +92,22 @@ bool ParseString(const std::wstring& text, size_t* pos, std::wstring* out) {
             case L't':
                 result.push_back(L'\t');
                 break;
+            case L'u': {
+                unsigned int codePoint = 0;
+                for (int i = 0; i < 4; ++i) {
+                    if (*pos >= text.size()) {
+                        return false;
+                    }
+                    unsigned int hex = 0;
+                    if (!ParseHexDigit(text[*pos], &hex)) {
+                        return false;
+                    }
+                    codePoint = (codePoint << 4) | hex;
+                    ++(*pos);
+                }
+                result.push_back(static_cast<wchar_t>(codePoint));
+                break;
+            }
             default:
                 return false;
             }
@@ -89,13 +121,20 @@ bool ParseString(const std::wstring& text, size_t* pos, std::wstring* out) {
 bool ParseUnsignedLongLong(const std::wstring& text, size_t* pos, unsigned long long* out) {
     SkipWhitespace(text, pos);
     const size_t start = *pos;
+    unsigned long long value = 0;
     while (*pos < text.size() && iswdigit(text[*pos]) != 0) {
+        const unsigned int digit = static_cast<unsigned int>(text[*pos] - L'0');
+        constexpr unsigned long long kMaxValue = ~0ULL;
+        if (value > (kMaxValue - digit) / 10) {
+            return false;
+        }
+        value = (value * 10) + digit;
         ++(*pos);
     }
     if (start == *pos) {
         return false;
     }
-    *out = std::stoull(text.substr(start, *pos - start));
+    *out = value;
     return true;
 }
 

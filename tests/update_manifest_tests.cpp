@@ -15,6 +15,22 @@ void Expect(bool condition, const char* message) {
     }
 }
 
+void ExpectWideEqual(const std::wstring& actual, const std::wstring& expected, const char* message) {
+    if (actual == expected) {
+        return;
+    }
+    std::cerr << "FAIL: " << message << "\nactual codepoints:";
+    for (wchar_t ch : actual) {
+        std::cerr << " " << static_cast<unsigned int>(ch);
+    }
+    std::cerr << "\nexpected codepoints:";
+    for (wchar_t ch : expected) {
+        std::cerr << " " << static_cast<unsigned int>(ch);
+    }
+    std::cerr << "\n";
+    std::exit(1);
+}
+
 void TestManifestParsesSchema() {
     const std::wstring json =
         LR"({"version":"1","packages":[{"id":"raw","name":"RAW 格式支持","version":"1.0.0","sha256":"abcdef","size":123,"url":"https://example.invalid/raw.zip","extensions":[".cr3",".nef"]}]})";
@@ -42,6 +58,22 @@ void TestManifestMissingFieldsBecomeDefaults() {
     Expect(manifest.packages[0].extensions.empty(), "manifest fallback extensions");
 }
 
+void TestManifestRejectsOversizedSizeSafely() {
+    const cpictures::CodecPackageManifest manifest = cpictures::ParseManifest(
+        LR"({"version":"1","packages":[{"id":"raw","size":18446744073709551616}]})");
+    Expect(manifest.version.empty(), "oversized size returns empty manifest version");
+    Expect(manifest.packages.empty(), "oversized size returns empty manifest packages");
+}
+
+void TestManifestParsesUnicodeEscapes() {
+    const cpictures::CodecPackageManifest manifest = cpictures::ParseManifest(
+        LR"({"version":"1","packages":[{"id":"raw","name":"RAW \u683C\u5F0F\u652F\u6301"}]})");
+    Expect(manifest.packages.size() == 1, "unicode package count");
+    ExpectWideEqual(manifest.packages[0].name,
+                    L"RAW \x683C\x5F0F\x652F\x6301",
+                    "unicode package name");
+}
+
 void TestSha256KnownValue() {
     const std::filesystem::path path =
         std::filesystem::temp_directory_path() / L"cpictures_sha256_abc.txt";
@@ -56,12 +88,22 @@ void TestSha256KnownValue() {
     std::filesystem::remove(path);
 }
 
+void TestSha256MissingFileReturnsEmpty() {
+    const std::filesystem::path path =
+        std::filesystem::temp_directory_path() / L"cpictures_sha256_missing.txt";
+    std::filesystem::remove(path);
+    Expect(cpictures::ComputeSha256(path).empty(), "sha256 missing file");
+}
+
 }  // namespace
 
 int main() {
     TestManifestParsesSchema();
     TestManifestMissingFieldsBecomeDefaults();
+    TestManifestRejectsOversizedSizeSafely();
+    TestManifestParsesUnicodeEscapes();
     TestSha256KnownValue();
+    TestSha256MissingFileReturnsEmpty();
     std::cout << "update manifest tests passed\n";
     return 0;
 }
