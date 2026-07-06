@@ -1,5 +1,6 @@
 #include "image/wic_decoder.h"
 
+#include <climits>
 #include <limits>
 #include <stdexcept>
 
@@ -83,6 +84,9 @@ DecodedImage WicDecoder::Decode(const std::filesystem::path& path) const {
     }
     if (bufferBytes > (std::numeric_limits<UINT>::max)()) {
         throw std::runtime_error("decoded image buffer exceeds UINT");
+    }
+    if (width > INT_MAX || height > INT_MAX) {
+        throw std::runtime_error("decoded image dimensions exceed int");
     }
 
     DecodedImage result;
