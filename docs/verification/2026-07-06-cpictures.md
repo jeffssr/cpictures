@@ -4,6 +4,8 @@
 
 验证提交：`3d5f894a67413d69eafc8d944f3c5eda1ecbe374`
 
+注：后续仅修正验证文档/README 链接，不改变已验证的二进制与测试结果。
+
 ## 环境
 
 - 工作区：`D:\Jimmy\ai_docs\cpictures`
