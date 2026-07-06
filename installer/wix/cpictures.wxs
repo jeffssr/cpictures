@@ -1,5 +1,72 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Fragment>
+    <StandardDirectory Id="ProgramFilesFolder">
+      <Directory Id="INSTALLFOLDER" Name="cpictures">
+        <Directory Id="BinFolder" Name="bin" />
+        <Directory Id="CodecsFolder" Name="codecs" />
+      </Directory>
+    </StandardDirectory>
+
+    <DirectoryRef Id="BinFolder">
+      <Component Id="CpicturesExecutable" Guid="*">
+        <File Id="CpicturesExe" Source="$(var.SourceDir)\bin\cpictures.exe" KeyPath="yes" />
+
+        <RegistryValue Root="HKLM" Key="Software\Microsoft\Windows\CurrentVersion\App Paths\cpictures.exe" Value="[BinFolder]cpictures.exe" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Microsoft\Windows\CurrentVersion\App Paths\cpictures.exe" Name="Path" Value="[BinFolder]" Type="string" />
+
+        <RegistryValue Root="HKLM" Key="Software\cpictures\Capabilities" Name="ApplicationName" Value="cpictures" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\cpictures\Capabilities" Name="ApplicationDescription" Value="极简图片查看器" Type="string" />
+
+        <RegistryValue Root="HKLM" Key="Software\cpictures\Capabilities\FileAssociations" Name=".jpg" Value="cpictures.image" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\cpictures\Capabilities\FileAssociations" Name=".jpeg" Value="cpictures.image" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\cpictures\Capabilities\FileAssociations" Name=".png" Value="cpictures.image" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\cpictures\Capabilities\FileAssociations" Name=".bmp" Value="cpictures.image" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\cpictures\Capabilities\FileAssociations" Name=".gif" Value="cpictures.image" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\cpictures\Capabilities\FileAssociations" Name=".tif" Value="cpictures.image" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\cpictures\Capabilities\FileAssociations" Name=".tiff" Value="cpictures.image" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\cpictures\Capabilities\FileAssociations" Name=".webp" Value="cpictures.image" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\cpictures\Capabilities\FileAssociations" Name=".heic" Value="cpictures.image" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\cpictures\Capabilities\FileAssociations" Name=".heif" Value="cpictures.image" Type="string" />
+
+        <RegistryValue Root="HKLM" Key="Software\RegisteredApplications" Name="cpictures" Value="Software\cpictures\Capabilities" Type="string" />
+
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\cpictures.exe\SupportedTypes" Name=".jpg" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\cpictures.exe\SupportedTypes" Name=".jpeg" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\cpictures.exe\SupportedTypes" Name=".png" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\cpictures.exe\SupportedTypes" Name=".bmp" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\cpictures.exe\SupportedTypes" Name=".gif" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\cpictures.exe\SupportedTypes" Name=".tif" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\cpictures.exe\SupportedTypes" Name=".tiff" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\cpictures.exe\SupportedTypes" Name=".webp" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\cpictures.exe\SupportedTypes" Name=".heic" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\cpictures.exe\SupportedTypes" Name=".heif" Value="" Type="string" />
+
+        <RegistryValue Root="HKCR" Key="cpictures.image" Value="cpictures 图片" Type="string" />
+        <RegistryValue Root="HKCR" Key="cpictures.image\shell\open\command" Value="&quot;[BinFolder]cpictures.exe&quot; &quot;%1&quot;" Type="string" />
+
+        <ProgId Id="cpictures.image" Description="cpictures 图片">
+          <Extension Id="jpg" ContentType="image/jpeg" />
+          <Extension Id="jpeg" ContentType="image/jpeg" />
+          <Extension Id="png" ContentType="image/png" />
+          <Extension Id="bmp" ContentType="image/bmp" />
+          <Extension Id="gif" ContentType="image/gif" />
+          <Extension Id="tif" ContentType="image/tiff" />
+          <Extension Id="tiff" ContentType="image/tiff" />
+          <Extension Id="webp" ContentType="image/webp" />
+          <Extension Id="heic" ContentType="image/heic" />
+          <Extension Id="heif" ContentType="image/heif" />
+        </ProgId>
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="CodecsFolder">
+      <Component Id="CpicturesCodecsFolder" Guid="*">
+        <CreateFolder />
+      </Component>
+    </DirectoryRef>
+  </Fragment>
+
   <Package
     Name="cpictures"
     Manufacturer="cpictures"
@@ -8,69 +75,9 @@
     <MajorUpgrade DowngradeErrorMessage="已安装更新版本的 cpictures。" />
     <MediaTemplate EmbedCab="yes" />
 
-    <StandardDirectory Id="ProgramFilesFolder">
-      <Directory Id="INSTALLFOLDER" Name="cpictures">
-        <Directory Id="BinFolder" Name="bin" />
-        <Directory Id="CodecsFolder" Name="codecs" />
-      </Directory>
-    </StandardDirectory>
-
-    <Fragment>
-      <DirectoryRef Id="BinFolder">
-        <Component Id="CpicturesExecutable" Guid="*">
-          <File Id="CpicturesExe" Source="$(var.SourceDir)\bin\cpictures.exe" KeyPath="yes" />
-
-          <RegistryValue Root="HKLM" Key="Software\Microsoft\Windows\CurrentVersion\App Paths\cpictures.exe" Value="[BinFolder]cpictures.exe" Type="string" />
-          <RegistryValue Root="HKLM" Key="Software\Microsoft\Windows\CurrentVersion\App Paths\cpictures.exe" Name="Path" Value="[BinFolder]" Type="string" />
-
-          <RegistryValue Root="HKLM" Key="Software\cpictures\Capabilities" Name="ApplicationName" Value="cpictures" Type="string" />
-          <RegistryValue Root="HKLM" Key="Software\cpictures\Capabilities" Name="ApplicationDescription" Value="极简图片查看器" Type="string" />
-
-          <RegistryValue Root="HKLM" Key="Software\cpictures\Capabilities\FileAssociations" Name=".jpg" Value="cpictures.image" Type="string" />
-          <RegistryValue Root="HKLM" Key="Software\cpictures\Capabilities\FileAssociations" Name=".jpeg" Value="cpictures.image" Type="string" />
-          <RegistryValue Root="HKLM" Key="Software\cpictures\Capabilities\FileAssociations" Name=".png" Value="cpictures.image" Type="string" />
-          <RegistryValue Root="HKLM" Key="Software\cpictures\Capabilities\FileAssociations" Name=".bmp" Value="cpictures.image" Type="string" />
-          <RegistryValue Root="HKLM" Key="Software\cpictures\Capabilities\FileAssociations" Name=".gif" Value="cpictures.image" Type="string" />
-          <RegistryValue Root="HKLM" Key="Software\cpictures\Capabilities\FileAssociations" Name=".tif" Value="cpictures.image" Type="string" />
-          <RegistryValue Root="HKLM" Key="Software\cpictures\Capabilities\FileAssociations" Name=".tiff" Value="cpictures.image" Type="string" />
-          <RegistryValue Root="HKLM" Key="Software\cpictures\Capabilities\FileAssociations" Name=".webp" Value="cpictures.image" Type="string" />
-          <RegistryValue Root="HKLM" Key="Software\cpictures\Capabilities\FileAssociations" Name=".heic" Value="cpictures.image" Type="string" />
-          <RegistryValue Root="HKLM" Key="Software\cpictures\Capabilities\FileAssociations" Name=".heif" Value="cpictures.image" Type="string" />
-
-          <RegistryValue Root="HKLM" Key="Software\RegisteredApplications" Name="cpictures" Value="Software\cpictures\Capabilities" Type="string" />
-
-          <RegistryValue Root="HKLM" Key="Software\Classes\Applications\cpictures.exe\SupportedTypes" Name=".jpg" Value="" Type="string" />
-          <RegistryValue Root="HKLM" Key="Software\Classes\Applications\cpictures.exe\SupportedTypes" Name=".jpeg" Value="" Type="string" />
-          <RegistryValue Root="HKLM" Key="Software\Classes\Applications\cpictures.exe\SupportedTypes" Name=".png" Value="" Type="string" />
-          <RegistryValue Root="HKLM" Key="Software\Classes\Applications\cpictures.exe\SupportedTypes" Name=".bmp" Value="" Type="string" />
-          <RegistryValue Root="HKLM" Key="Software\Classes\Applications\cpictures.exe\SupportedTypes" Name=".gif" Value="" Type="string" />
-          <RegistryValue Root="HKLM" Key="Software\Classes\Applications\cpictures.exe\SupportedTypes" Name=".tif" Value="" Type="string" />
-          <RegistryValue Root="HKLM" Key="Software\Classes\Applications\cpictures.exe\SupportedTypes" Name=".tiff" Value="" Type="string" />
-          <RegistryValue Root="HKLM" Key="Software\Classes\Applications\cpictures.exe\SupportedTypes" Name=".webp" Value="" Type="string" />
-          <RegistryValue Root="HKLM" Key="Software\Classes\Applications\cpictures.exe\SupportedTypes" Name=".heic" Value="" Type="string" />
-          <RegistryValue Root="HKLM" Key="Software\Classes\Applications\cpictures.exe\SupportedTypes" Name=".heif" Value="" Type="string" />
-
-          <RegistryValue Root="HKCR" Key="cpictures.image" Value="cpictures 图片" Type="string" />
-          <RegistryValue Root="HKCR" Key="cpictures.image\shell\open\command" Value="&quot;[BinFolder]cpictures.exe&quot; &quot;%1&quot;" Type="string" />
-
-          <ProgId Id="cpictures.image" Description="cpictures 图片">
-            <Extension Id="jpg" ContentType="image/jpeg" />
-            <Extension Id="jpeg" ContentType="image/jpeg" />
-            <Extension Id="png" ContentType="image/png" />
-            <Extension Id="bmp" ContentType="image/bmp" />
-            <Extension Id="gif" ContentType="image/gif" />
-            <Extension Id="tif" ContentType="image/tiff" />
-            <Extension Id="tiff" ContentType="image/tiff" />
-            <Extension Id="webp" ContentType="image/webp" />
-            <Extension Id="heic" ContentType="image/heic" />
-            <Extension Id="heif" ContentType="image/heif" />
-          </ProgId>
-        </Component>
-      </DirectoryRef>
-    </Fragment>
-
     <Feature Id="Main" Title="cpictures" Level="1">
       <ComponentRef Id="CpicturesExecutable" />
+      <ComponentRef Id="CpicturesCodecsFolder" />
     </Feature>
   </Package>
 </Wix>
