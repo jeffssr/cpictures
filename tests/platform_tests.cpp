@@ -1,7 +1,10 @@
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <iostream>
 #include <string>
+#include <utility>
+#include <vector>
 
 #include <windows.h>
 #include <shellapi.h>
@@ -26,13 +29,113 @@ bool OpenClipboardWithRetry(HWND owner) {
     return false;
 }
 
-bool ClipboardUnavailableInEnvironment() {
-    if (OpenClipboardWithRetry(nullptr)) {
-        CloseClipboard();
-        return false;
+HGLOBAL DuplicateClipboardHandle(HANDLE source) {
+    if (source == nullptr) {
+        return nullptr;
     }
-    return GetLastError() == ERROR_ACCESS_DENIED;
+
+    const SIZE_T size = GlobalSize(source);
+    if (size == 0) {
+        return nullptr;
+    }
+
+    const void* sourceBytes = GlobalLock(source);
+    if (sourceBytes == nullptr) {
+        return nullptr;
+    }
+
+    HGLOBAL copy = GlobalAlloc(GMEM_MOVEABLE, size);
+    if (copy == nullptr) {
+        GlobalUnlock(source);
+        return nullptr;
+    }
+
+    void* destinationBytes = GlobalLock(copy);
+    if (destinationBytes == nullptr) {
+        GlobalUnlock(source);
+        GlobalFree(copy);
+        return nullptr;
+    }
+
+    std::memcpy(destinationBytes, sourceBytes, size);
+    GlobalUnlock(copy);
+    GlobalUnlock(source);
+    return copy;
 }
+
+class ClipboardSnapshot {
+public:
+    explicit ClipboardSnapshot(HWND owner) {
+        if (!OpenClipboardWithRetry(owner)) {
+            skipReason_ = "platform tests skipped: clipboard access denied in this environment";
+            return;
+        }
+
+        for (UINT format = 0; (format = EnumClipboardFormats(format)) != 0;) {
+            HANDLE handle = GetClipboardData(format);
+            if (handle == nullptr) {
+                skipReason_ = "platform tests skipped: failed to read clipboard format";
+                CloseClipboard();
+                ClearOwnedHandles();
+                return;
+            }
+
+            HGLOBAL copy = DuplicateClipboardHandle(handle);
+            if (copy == nullptr) {
+                skipReason_ = "platform tests skipped: clipboard contains unsupported non-HGLOBAL data";
+                CloseClipboard();
+                ClearOwnedHandles();
+                return;
+            }
+
+            formats_.push_back({format, copy});
+        }
+
+        CloseClipboard();
+        restorable_ = true;
+    }
+
+    ClipboardSnapshot(const ClipboardSnapshot&) = delete;
+    ClipboardSnapshot& operator=(const ClipboardSnapshot&) = delete;
+
+    ~ClipboardSnapshot() {
+        if (!restorable_) {
+            ClearOwnedHandles();
+            return;
+        }
+
+        if (!OpenClipboardWithRetry(nullptr)) {
+            ClearOwnedHandles();
+            return;
+        }
+
+        EmptyClipboard();
+        for (auto& entry : formats_) {
+            if (SetClipboardData(entry.first, entry.second) != nullptr) {
+                entry.second = nullptr;
+            }
+        }
+        CloseClipboard();
+        ClearOwnedHandles();
+    }
+
+    [[nodiscard]] bool ShouldSkip() const { return !skipReason_.empty(); }
+    [[nodiscard]] const char* SkipReason() const { return skipReason_.c_str(); }
+
+private:
+    void ClearOwnedHandles() {
+        for (auto& entry : formats_) {
+            if (entry.second != nullptr) {
+                GlobalFree(entry.second);
+                entry.second = nullptr;
+            }
+        }
+    }
+
+    bool restorable_ = false;
+    std::string skipReason_;
+    std::vector<std::pair<UINT, HGLOBAL>> formats_;
+};
 
 class ClipboardOwnerWindow {
 public:
@@ -82,15 +185,18 @@ void TestCopyFileToClipboard(HWND owner) {
     Expect(actual == expected, "clipboard file path matches source");
     CloseClipboard();
 }
-}
+}  // namespace
 
 int main() {
-    if (ClipboardUnavailableInEnvironment()) {
-        std::cout << "platform tests skipped: clipboard access denied in this environment\n";
-        return 0;
-    }
     ClipboardOwnerWindow owner;
     Expect(owner.IsValid(), "clipboard owner window created");
+
+    ClipboardSnapshot snapshot(owner.handle());
+    if (snapshot.ShouldSkip()) {
+        std::cout << snapshot.SkipReason() << "\n";
+        return 0;
+    }
+
     TestCopyTextToClipboard(owner.handle());
     TestCopyFileToClipboard(owner.handle());
     std::cout << "platform tests passed\n";
