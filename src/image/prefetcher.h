@@ -1,11 +1,11 @@
 #pragma once
 
+#include <condition_variable>
 #include <filesystem>
 #include <mutex>
 #include <optional>
 #include <thread>
 #include <unordered_map>
-#include <vector>
 
 #include "image/wic_decoder.h"
 
@@ -21,11 +21,17 @@ public:
     void Stop();
 
 private:
-    void DecodeOne(std::filesystem::path path, size_t generation);
+    void EnsureWorkerStarted();
+    void RunWorker();
+    void DecodeOne(const std::filesystem::path& path, size_t generation, WicDecoder& decoder);
 
+    std::condition_variable condition_;
     std::mutex mutex_;
     std::unordered_map<std::wstring, DecodedImage> cache_;
-    std::vector<std::thread> workers_;
+    std::thread worker_;
+    std::filesystem::path pendingFirst_;
+    std::filesystem::path pendingSecond_;
+    bool hasPending_ = false;
     size_t generation_ = 0;
     bool stopped_ = false;
 };

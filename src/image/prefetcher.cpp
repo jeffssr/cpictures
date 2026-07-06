@@ -6,28 +6,33 @@ Prefetcher::~Prefetcher() {
     Stop();
 }
 
+void Prefetcher::EnsureWorkerStarted() {
+    if (!worker_.joinable()) {
+        worker_ = std::thread([this] {
+            RunWorker();
+        });
+    }
+}
+
 void Prefetcher::Cancel() {
     std::lock_guard lock(mutex_);
     stopped_ = false;
     cache_.clear();
+    hasPending_ = false;
     ++generation_;
+    condition_.notify_one();
 }
 
 void Prefetcher::Warm(const std::filesystem::path& first, const std::filesystem::path& second) {
-    Cancel();
-    const size_t generation = [&] {
-        std::lock_guard lock(mutex_);
-        return generation_;
-    }();
-
-    workers_.emplace_back([this, first, generation] {
-        DecodeOne(first, generation);
-    });
-    if (second != first) {
-        workers_.emplace_back([this, second, generation] {
-            DecodeOne(second, generation);
-        });
-    }
+    std::lock_guard lock(mutex_);
+    EnsureWorkerStarted();
+    stopped_ = false;
+    cache_.clear();
+    pendingFirst_ = first;
+    pendingSecond_ = second;
+    hasPending_ = true;
+    ++generation_;
+    condition_.notify_one();
 }
 
 std::optional<DecodedImage> Prefetcher::Take(const std::filesystem::path& path) {
@@ -44,24 +49,51 @@ std::optional<DecodedImage> Prefetcher::Take(const std::filesystem::path& path) 
 }
 
 void Prefetcher::Stop() {
-    std::vector<std::thread> workers;
+    std::thread worker;
     {
         std::lock_guard lock(mutex_);
         stopped_ = true;
+        hasPending_ = false;
         ++generation_;
-        workers.swap(workers_);
+        worker.swap(worker_);
     }
+    condition_.notify_one();
 
-    for (auto& worker : workers) {
-        if (worker.joinable()) {
-            worker.join();
+    if (worker.joinable()) {
+        worker.join();
+    }
+}
+
+void Prefetcher::RunWorker() {
+    WicDecoder decoder;
+    while (true) {
+        std::filesystem::path first;
+        std::filesystem::path second;
+        size_t generation = 0;
+        {
+            std::unique_lock lock(mutex_);
+            condition_.wait(lock, [this] {
+                return stopped_ || hasPending_;
+            });
+            if (stopped_) {
+                return;
+            }
+
+            first = pendingFirst_;
+            second = pendingSecond_;
+            generation = generation_;
+            hasPending_ = false;
+        }
+
+        DecodeOne(first, generation, decoder);
+        if (second != first) {
+            DecodeOne(second, generation, decoder);
         }
     }
 }
 
-void Prefetcher::DecodeOne(std::filesystem::path path, size_t generation) {
+void Prefetcher::DecodeOne(const std::filesystem::path& path, size_t generation, WicDecoder& decoder) {
     try {
-        WicDecoder decoder;
         DecodedImage image = decoder.Decode(path);
         std::lock_guard lock(mutex_);
         if (!stopped_ && generation_ == generation) {
