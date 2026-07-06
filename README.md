@@ -36,3 +36,7 @@ WiX 源文件位于 `installer/wix/cpictures.wxs`，使用 WiX Toolset v4 schema
 cmake --build --preset release
 cmake --install build\vs2026-x64 --config Release --prefix dist
 ```
+
+## 验证记录
+
+最新验证记录见 [docs/verification/2026-07-06-cpictures.md](/D:/Jimmy/ai_docs/cpictures/docs/verification/2026-07-06-cpictures.md)。其中区分了已完成自动验证、未完成手动验证，以及当前已知限制。
