@@ -296,7 +296,7 @@ void ViewerWindow::LoadCurrentImage() {
 
 void ViewerWindow::WarmPrefetch() {
     if (imageList_.Count() < 2) {
-        prefetcher_.Stop();
+        prefetcher_.Cancel();
         return;
     }
 

@@ -15,16 +15,18 @@ class Prefetcher {
 public:
     ~Prefetcher();
 
+    void Cancel();
     void Warm(const std::filesystem::path& first, const std::filesystem::path& second);
     std::optional<DecodedImage> Take(const std::filesystem::path& path);
     void Stop();
 
 private:
-    void DecodeOne(std::filesystem::path path);
+    void DecodeOne(std::filesystem::path path, size_t generation);
 
     std::mutex mutex_;
     std::unordered_map<std::wstring, DecodedImage> cache_;
     std::vector<std::thread> workers_;
+    size_t generation_ = 0;
     bool stopped_ = false;
 };
 

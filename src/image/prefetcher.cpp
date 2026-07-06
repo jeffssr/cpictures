@@ -6,20 +6,26 @@ Prefetcher::~Prefetcher() {
     Stop();
 }
 
-void Prefetcher::Warm(const std::filesystem::path& first, const std::filesystem::path& second) {
-    Stop();
-    {
-        std::lock_guard lock(mutex_);
-        stopped_ = false;
-        cache_.clear();
-    }
+void Prefetcher::Cancel() {
+    std::lock_guard lock(mutex_);
+    stopped_ = false;
+    cache_.clear();
+    ++generation_;
+}
 
-    workers_.emplace_back([this, first] {
-        DecodeOne(first);
+void Prefetcher::Warm(const std::filesystem::path& first, const std::filesystem::path& second) {
+    Cancel();
+    const size_t generation = [&] {
+        std::lock_guard lock(mutex_);
+        return generation_;
+    }();
+
+    workers_.emplace_back([this, first, generation] {
+        DecodeOne(first, generation);
     });
     if (second != first) {
-        workers_.emplace_back([this, second] {
-            DecodeOne(second);
+        workers_.emplace_back([this, second, generation] {
+            DecodeOne(second, generation);
         });
     }
 }
@@ -38,25 +44,27 @@ std::optional<DecodedImage> Prefetcher::Take(const std::filesystem::path& path) 
 }
 
 void Prefetcher::Stop() {
+    std::vector<std::thread> workers;
     {
         std::lock_guard lock(mutex_);
         stopped_ = true;
+        ++generation_;
+        workers.swap(workers_);
     }
 
-    for (auto& worker : workers_) {
+    for (auto& worker : workers) {
         if (worker.joinable()) {
             worker.join();
         }
     }
-    workers_.clear();
 }
 
-void Prefetcher::DecodeOne(std::filesystem::path path) {
+void Prefetcher::DecodeOne(std::filesystem::path path, size_t generation) {
     try {
         WicDecoder decoder;
         DecodedImage image = decoder.Decode(path);
         std::lock_guard lock(mutex_);
-        if (!stopped_) {
+        if (!stopped_ && generation_ == generation) {
             cache_[std::filesystem::absolute(path).wstring()] = std::move(image);
         }
     } catch (...) {
