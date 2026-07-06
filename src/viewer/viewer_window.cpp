@@ -8,6 +8,7 @@
 #include "cpictures/overlay.h"
 #include "platform/clipboard_service.h"
 #include "platform/context_menu.h"
+#include "update/update_service.h"
 
 namespace cpictures {
 namespace {
@@ -247,11 +248,7 @@ void ViewerWindow::ExecuteCommand(Command command) {
         CopyTextToClipboard(hwnd_, std::filesystem::absolute(imageList_.Current()).wstring());
         break;
     case Command::InstallOrUpdateFormats:
-        MessageBoxW(
-            hwnd_,
-            L"\x6269\x5C55\x683C\x5F0F\x652F\x6301\x5C06\x5728\x683C\x5F0F\x7EC4\x4EF6\x4E2D\x5B89\x88C5\x6216\x66F4\x65B0\x3002",
-            L"cpictures",
-            MB_OK | MB_ICONINFORMATION);
+        ShowFormatSupportDialog(hwnd_);
         break;
     }
 

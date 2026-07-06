@@ -40,12 +40,14 @@ add_executable(cpictures WIN32
   src/platform/clipboard_service.cpp
   src/platform/context_menu.cpp
   src/render/d2d_renderer.cpp
+  src/update/update_manifest.cpp
+  src/update/update_service.cpp
   src/viewer/viewer_window.cpp
 )
 target_compile_features(cpictures PRIVATE cxx_std_20)
 target_include_directories(cpictures PRIVATE include src)
 target_compile_definitions(cpictures PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
-target_link_libraries(cpictures PRIVATE cpictures_core windowscodecs d2d1 dwrite dxgi ole32 shell32 user32 gdi32)
+target_link_libraries(cpictures PRIVATE cpictures_core windowscodecs d2d1 dwrite dxgi ole32 shell32 user32 gdi32 bcrypt)
 
 include(CTest)
 if(BUILD_TESTING AND CPICTURES_BUILD_TESTS)
@@ -80,4 +82,15 @@ if(BUILD_TESTING AND CPICTURES_BUILD_TESTS)
   target_include_directories(cpictures_codec_abi_c_test PRIVATE src)
   target_compile_features(cpictures_codec_abi_c_test PRIVATE c_std_11)
   add_test(NAME cpictures_codec_abi_c_test COMMAND cpictures_codec_abi_c_test)
+
+  add_executable(cpictures_update_manifest_tests
+    tests/update_manifest_tests.cpp
+    src/update/update_manifest.cpp
+    src/update/update_service.cpp
+  )
+  target_compile_features(cpictures_update_manifest_tests PRIVATE cxx_std_20)
+  target_include_directories(cpictures_update_manifest_tests PRIVATE include src)
+  target_compile_definitions(cpictures_update_manifest_tests PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
+  target_link_libraries(cpictures_update_manifest_tests PRIVATE bcrypt)
+  add_test(NAME cpictures_update_manifest_tests COMMAND cpictures_update_manifest_tests)
 endif()
