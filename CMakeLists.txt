@@ -21,6 +21,17 @@ if(MSVC)
   target_compile_options(cpictures_core PRIVATE /FS)
 endif()
 
+add_library(cpictures_codecs STATIC
+  src/codecs/codec_manager.cpp
+)
+target_compile_features(cpictures_codecs PUBLIC cxx_std_20)
+target_include_directories(cpictures_codecs PUBLIC include src)
+target_compile_definitions(cpictures_codecs PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_link_libraries(cpictures_codecs PRIVATE cpictures_core)
+if(MSVC)
+  target_compile_options(cpictures_codecs PRIVATE /FS)
+endif()
+
 add_executable(cpictures WIN32
   src/main.cpp
   src/app/app.cpp
@@ -57,4 +68,11 @@ if(BUILD_TESTING AND CPICTURES_BUILD_TESTS)
   target_compile_definitions(cpictures_platform_tests PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
   target_link_libraries(cpictures_platform_tests PRIVATE shell32 user32)
   add_test(NAME cpictures_platform_tests COMMAND cpictures_platform_tests)
+
+  add_executable(cpictures_codec_manager_tests tests/codec_manager_tests.cpp)
+  target_compile_features(cpictures_codec_manager_tests PRIVATE cxx_std_20)
+  target_include_directories(cpictures_codec_manager_tests PRIVATE include src)
+  target_link_libraries(cpictures_codec_manager_tests PRIVATE cpictures_codecs)
+  target_compile_definitions(cpictures_codec_manager_tests PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
+  add_test(NAME cpictures_codec_manager_tests COMMAND cpictures_codec_manager_tests)
 endif()
