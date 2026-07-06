@@ -25,6 +25,8 @@ add_executable(cpictures WIN32
   src/main.cpp
   src/app/app.cpp
   src/image/wic_decoder.cpp
+  src/platform/clipboard_service.cpp
+  src/platform/context_menu.cpp
   src/render/d2d_renderer.cpp
   src/viewer/viewer_window.cpp
 )
@@ -47,4 +49,11 @@ if(BUILD_TESTING AND CPICTURES_BUILD_TESTS)
   target_compile_definitions(cpictures_wic_tests PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
   target_link_libraries(cpictures_wic_tests PRIVATE cpictures_core windowscodecs ole32)
   add_test(NAME cpictures_wic_tests COMMAND cpictures_wic_tests)
+
+  add_executable(cpictures_platform_tests tests/platform_tests.cpp src/platform/clipboard_service.cpp)
+  target_compile_features(cpictures_platform_tests PRIVATE cxx_std_20)
+  target_include_directories(cpictures_platform_tests PRIVATE include src)
+  target_compile_definitions(cpictures_platform_tests PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
+  target_link_libraries(cpictures_platform_tests PRIVATE shell32 user32)
+  add_test(NAME cpictures_platform_tests COMMAND cpictures_platform_tests)
 endif()

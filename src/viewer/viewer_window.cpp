@@ -3,7 +3,11 @@
 #include <algorithm>
 #include <exception>
 
+#include <windowsx.h>
+
 #include "cpictures/overlay.h"
+#include "platform/clipboard_service.h"
+#include "platform/context_menu.h"
 
 namespace cpictures {
 namespace {
@@ -135,6 +139,14 @@ LRESULT ViewerWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) 
             return 0;
         }
         if ((GetKeyState(VK_CONTROL) & 0x8000) != 0) {
+            if (wparam == L'C') {
+                if ((GetKeyState(VK_SHIFT) & 0x8000) != 0) {
+                    ExecuteCommand(Command::CopyPath);
+                } else {
+                    ExecuteCommand(Command::CopyFile);
+                }
+                return 0;
+            }
             if (wparam == L'L') {
                 ExecuteCommand(Command::RotateLeft);
                 return 0;
@@ -157,6 +169,18 @@ LRESULT ViewerWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) 
             ExecuteCommand(delta > 0 ? Command::ZoomIn : Command::ZoomOut);
         } else {
             ExecuteCommand(delta > 0 ? Command::PreviousImage : Command::NextImage);
+        }
+        return 0;
+    }
+    case WM_CONTEXTMENU: {
+        POINT point{GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
+        if (point.x == -1 && point.y == -1) {
+            RECT rect{};
+            GetWindowRect(hwnd_, &rect);
+            point = {rect.left + 24, rect.top + 24};
+        }
+        if (const auto command = ShowContextMenu(hwnd_, point)) {
+            ExecuteCommand(*command);
         }
         return 0;
     }
@@ -217,8 +241,17 @@ void ViewerWindow::ExecuteCommand(Command command) {
         RotateBy(90);
         break;
     case Command::CopyFile:
+        CopyFileToClipboard(hwnd_, imageList_.Current());
+        break;
     case Command::CopyPath:
+        CopyTextToClipboard(hwnd_, std::filesystem::absolute(imageList_.Current()).wstring());
+        break;
     case Command::InstallOrUpdateFormats:
+        MessageBoxW(
+            hwnd_,
+            L"\x6269\x5C55\x683C\x5F0F\x652F\x6301\x5C06\x5728\x683C\x5F0F\x7EC4\x4EF6\x4E2D\x5B89\x88C5\x6216\x66F4\x65B0\x3002",
+            L"cpictures",
+            MB_OK | MB_ICONINFORMATION);
         break;
     }
 
