@@ -108,7 +108,10 @@ LRESULT ViewerWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) 
         return 1;
     case WM_PAINT: {
         PAINTSTRUCT ps{};
-        BeginPaint(hwnd_, &ps);
+        HDC dc = BeginPaint(hwnd_, &ps);
+        RECT client{};
+        GetClientRect(hwnd_, &client);
+        FillRect(dc, &client, reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1));
         EndPaint(hwnd_, &ps);
         return 0;
     }

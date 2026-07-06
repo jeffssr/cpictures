@@ -1,7 +1,9 @@
 #include "app/app.h"
 
 #include <shellapi.h>
+#include <windows.h>
 
+#include <exception>
 #include <filesystem>
 #include <string_view>
 
@@ -26,14 +28,22 @@ std::filesystem::path ExtractImagePath(std::wstring_view commandLine) {
 }  // namespace
 
 int RunApplication(HINSTANCE instance, int showCommand, std::wstring_view commandLine) {
-    const std::filesystem::path path = ExtractImagePath(commandLine);
-    if (path.empty()) {
-        MessageBoxW(nullptr, L"cpictures: pass an image path.", L"cpictures", MB_OK | MB_ICONINFORMATION);
+    try {
+        const std::filesystem::path path = ExtractImagePath(commandLine);
+        if (path.empty()) {
+            MessageBoxW(nullptr, L"cpictures: pass an image path.", L"cpictures", MB_OK | MB_ICONINFORMATION);
+            return 1;
+        }
+
+        ViewerWindow window(instance, showCommand);
+        return window.CreateAndShow(path);
+    } catch (const std::exception&) {
+        MessageBoxW(nullptr, L"cpictures: startup failed.", L"cpictures", MB_OK | MB_ICONERROR);
+        return 1;
+    } catch (...) {
+        MessageBoxW(nullptr, L"cpictures: startup failed.", L"cpictures", MB_OK | MB_ICONERROR);
         return 1;
     }
-
-    ViewerWindow window(instance, showCommand);
-    return window.CreateAndShow(path);
 }
 
 }  // namespace cpictures
