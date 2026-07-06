@@ -5,6 +5,7 @@
 
 #include <windows.h>
 
+#include "cpictures/commands.h"
 #include "cpictures/image_list.h"
 #include "cpictures/geometry.h"
 #include "cpictures/view_state.h"
@@ -22,7 +23,15 @@ private:
     static LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam);
     LRESULT HandleMessage(UINT message, WPARAM wparam, LPARAM lparam);
     void Close();
+    void ExecuteCommand(Command command);
     void LoadCurrentImage();
+    void ShowNextImage();
+    void ShowPreviousImage();
+    void ApplyZoom(double factor);
+    void SetActualSize();
+    void SetFitToScreen();
+    void ToggleFullscreen();
+    void RotateBy(int degrees);
     SizeI WorkAreaForWindow() const;
     std::wstring OverlayText() const;
 
@@ -34,6 +43,8 @@ private:
     WicDecoder decoder_;
     DecodedImage decoded_;
     D2DRenderer renderer_;
+    RECT restoreRect_{};
+    bool hasRestoreRect_ = false;
 };
 
 }  // namespace cpictures

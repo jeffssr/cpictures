@@ -122,11 +122,17 @@ void D2DRenderer::Render(HWND hwnd, const ViewState& state, const std::wstring& 
             (clientSize.height - drawHeight) * 0.5f,
             (clientSize.width + drawWidth) * 0.5f,
             (clientSize.height + drawHeight) * 0.5f);
+        D2D1_MATRIX_3X2_F originalTransform{};
+        target_->GetTransform(&originalTransform);
+        const D2D1_POINT_2F center = D2D1::Point2F(clientSize.width * 0.5f, clientSize.height * 0.5f);
+        target_->SetTransform(
+            D2D1::Matrix3x2F::Rotation(static_cast<float>(state.rotationDegrees), center) * originalTransform);
         target_->DrawBitmap(
             bitmap_.Get(),
             destination,
             1.0f,
             D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
+        target_->SetTransform(originalTransform);
     }
 
     if (state.overlayVisible && !overlayText.empty()) {

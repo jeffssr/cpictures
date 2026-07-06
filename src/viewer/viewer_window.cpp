@@ -1,5 +1,6 @@
 #include "viewer/viewer_window.h"
 
+#include <algorithm>
 #include <exception>
 
 #include "cpictures/overlay.h"
@@ -105,6 +106,36 @@ LRESULT ViewerWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) 
             Close();
             return 0;
         }
+        if (wparam == VK_LEFT || wparam == VK_PRIOR) {
+            ExecuteCommand(Command::PreviousImage);
+            return 0;
+        }
+        if (wparam == VK_RIGHT || wparam == VK_NEXT) {
+            ExecuteCommand(Command::NextImage);
+            return 0;
+        }
+        if (wparam == L'1') {
+            ExecuteCommand(Command::ActualSize);
+            return 0;
+        }
+        if (wparam == L'0') {
+            ExecuteCommand(Command::FitToScreen);
+            return 0;
+        }
+        if (wparam == VK_F11) {
+            ExecuteCommand(Command::ToggleFullscreen);
+            return 0;
+        }
+        if ((GetKeyState(VK_CONTROL) & 0x8000) != 0) {
+            if (wparam == L'L') {
+                ExecuteCommand(Command::RotateLeft);
+                return 0;
+            }
+            if (wparam == L'R') {
+                ExecuteCommand(Command::RotateRight);
+                return 0;
+            }
+        }
         break;
     case WM_ERASEBKGND:
         return 1;
@@ -112,6 +143,15 @@ LRESULT ViewerWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) 
         viewState_.overlayVisible = !viewState_.overlayVisible;
         InvalidateRect(hwnd_, nullptr, FALSE);
         return 0;
+    case WM_MOUSEWHEEL: {
+        const short delta = GET_WHEEL_DELTA_WPARAM(wparam);
+        if ((GET_KEYSTATE_WPARAM(wparam) & MK_CONTROL) != 0) {
+            ExecuteCommand(delta > 0 ? Command::ZoomIn : Command::ZoomOut);
+        } else {
+            ExecuteCommand(delta > 0 ? Command::PreviousImage : Command::NextImage);
+        }
+        return 0;
+    }
     case WM_SIZE:
         renderer_.Resize(hwnd_);
         return 0;
@@ -137,6 +177,44 @@ void ViewerWindow::Close() {
         DestroyWindow(hwnd_);
         hwnd_ = nullptr;
     }
+}
+
+void ViewerWindow::ExecuteCommand(Command command) {
+    switch (command) {
+    case Command::PreviousImage:
+        ShowPreviousImage();
+        break;
+    case Command::NextImage:
+        ShowNextImage();
+        break;
+    case Command::ZoomIn:
+        ApplyZoom(1.1);
+        break;
+    case Command::ZoomOut:
+        ApplyZoom(1.0 / 1.1);
+        break;
+    case Command::ActualSize:
+        SetActualSize();
+        break;
+    case Command::FitToScreen:
+        SetFitToScreen();
+        break;
+    case Command::ToggleFullscreen:
+        ToggleFullscreen();
+        break;
+    case Command::RotateLeft:
+        RotateBy(-90);
+        break;
+    case Command::RotateRight:
+        RotateBy(90);
+        break;
+    case Command::CopyFile:
+    case Command::CopyPath:
+    case Command::InstallOrUpdateFormats:
+        break;
+    }
+
+    InvalidateRect(hwnd_, nullptr, FALSE);
 }
 
 void ViewerWindow::LoadCurrentImage() {
@@ -168,6 +246,82 @@ void ViewerWindow::LoadCurrentImage() {
 
     renderer_.EnsureDevice(hwnd_);
     renderer_.SetImage(decoded_);
+}
+
+void ViewerWindow::ShowNextImage() {
+    imageList_.Next();
+    viewState_.zoom = 1.0;
+    viewState_.rotationDegrees = 0;
+    viewState_.fitMode = FitMode::ActualSize;
+    LoadCurrentImage();
+}
+
+void ViewerWindow::ShowPreviousImage() {
+    imageList_.Previous();
+    viewState_.zoom = 1.0;
+    viewState_.rotationDegrees = 0;
+    viewState_.fitMode = FitMode::ActualSize;
+    LoadCurrentImage();
+}
+
+void ViewerWindow::ApplyZoom(double factor) {
+    viewState_.fitMode = FitMode::ActualSize;
+    viewState_.zoom = std::clamp(viewState_.zoom * factor, 0.05, 32.0);
+}
+
+void ViewerWindow::SetActualSize() {
+    viewState_.fitMode = FitMode::ActualSize;
+    viewState_.zoom = 1.0;
+}
+
+void ViewerWindow::SetFitToScreen() {
+    viewState_.fitMode = FitMode::FitToScreen;
+    const SizeI work = WorkAreaForWindow();
+    const SizeI fit = FitImageWindow(decoded_.size, work);
+    if (decoded_.size.width > 0) {
+        viewState_.zoom = static_cast<double>(fit.width) / static_cast<double>(decoded_.size.width);
+    } else {
+        viewState_.zoom = 1.0;
+    }
+}
+
+void ViewerWindow::ToggleFullscreen() {
+    if (!viewState_.fullscreen) {
+        GetWindowRect(hwnd_, &restoreRect_);
+        hasRestoreRect_ = true;
+
+        HMONITOR monitor = MonitorFromWindow(hwnd_, MONITOR_DEFAULTTONEAREST);
+        MONITORINFO info{sizeof(info)};
+        GetMonitorInfoW(monitor, &info);
+        SetWindowPos(
+            hwnd_,
+            HWND_TOP,
+            info.rcMonitor.left,
+            info.rcMonitor.top,
+            info.rcMonitor.right - info.rcMonitor.left,
+            info.rcMonitor.bottom - info.rcMonitor.top,
+            SWP_FRAMECHANGED);
+        viewState_.fullscreen = true;
+        return;
+    }
+
+    if (!hasRestoreRect_) {
+        return;
+    }
+
+    SetWindowPos(
+        hwnd_,
+        nullptr,
+        restoreRect_.left,
+        restoreRect_.top,
+        restoreRect_.right - restoreRect_.left,
+        restoreRect_.bottom - restoreRect_.top,
+        SWP_NOZORDER | SWP_FRAMECHANGED);
+    viewState_.fullscreen = false;
+}
+
+void ViewerWindow::RotateBy(int degrees) {
+    viewState_.rotationDegrees = (viewState_.rotationDegrees + degrees + 360) % 360;
 }
 
 SizeI ViewerWindow::WorkAreaForWindow() const {
