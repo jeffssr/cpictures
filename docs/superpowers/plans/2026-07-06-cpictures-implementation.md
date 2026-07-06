@@ -22,7 +22,7 @@
 - 第一版不做：删除、编辑、图库管理、打印、文件移动、另存为、批处理、常驻工具栏、标题栏、状态栏、静默下载、静默更新。
 - 扩展下载必须用户确认，并校验 SHA-256。
 - 当前目录起始状态不是 git 仓库；第一任务初始化 git，便于按任务提交。
-- 当前 PATH 未发现 `cmake`、`ninja`、`cl`、`msbuild`；执行前需安装 Visual Studio 2022 Build Tools（Desktop development with C++）、Windows SDK、CMake，或在 “Developer PowerShell for VS 2022” 中执行。
+- 当前 PATH 未发现 `cmake`、`ninja`、`cl`、`msbuild`；执行前需安装 Visual Studio Community 2026 或 Build Tools 2026（Desktop development with C++）、Windows SDK、CMake 4.2+，或在 “Developer PowerShell for VS 2026” 中执行。
 
 ---
 
@@ -148,7 +148,7 @@ Initialized empty Git repository
 Create `CMakeLists.txt`:
 
 ```cmake
-cmake_minimum_required(VERSION 3.24)
+cmake_minimum_required(VERSION 4.2)
 project(cpictures VERSION 0.1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
@@ -174,11 +174,11 @@ Create `CMakePresets.json`:
   "version": 6,
   "configurePresets": [
     {
-      "name": "vs2022-x64",
-      "displayName": "Visual Studio 2022 x64",
-      "generator": "Visual Studio 17 2022",
+      "name": "vs2026-x64",
+      "displayName": "Visual Studio 2026 x64",
+      "generator": "Visual Studio 18 2026",
       "architecture": "x64",
-      "binaryDir": "${sourceDir}/build/vs2022-x64",
+      "binaryDir": "${sourceDir}/build/vs2026-x64",
       "cacheVariables": {
         "CMAKE_INSTALL_PREFIX": "${sourceDir}/dist"
       }
@@ -187,19 +187,19 @@ Create `CMakePresets.json`:
   "buildPresets": [
     {
       "name": "debug",
-      "configurePreset": "vs2022-x64",
+      "configurePreset": "vs2026-x64",
       "configuration": "Debug"
     },
     {
       "name": "release",
-      "configurePreset": "vs2022-x64",
+      "configurePreset": "vs2026-x64",
       "configuration": "Release"
     }
   ],
   "testPresets": [
     {
       "name": "debug",
-      "configurePreset": "vs2022-x64",
+      "configurePreset": "vs2026-x64",
       "configuration": "Debug",
       "output": {
         "outputOnFailure": true
@@ -220,16 +220,16 @@ Win11 原生图片查看器。目标：极速、轻量、极简。
 
 ## 构建前提
 
-- Visual Studio 2022 Build Tools，包含 Desktop development with C++
+- Visual Studio Community 2026 或 Build Tools 2026，包含 Desktop development with C++
 - Windows SDK
-- CMake 3.24+
+- CMake 4.2+
 
-若普通 PowerShell 找不到 `cl` 或 `cmake`，使用 “Developer PowerShell for VS 2022”。
+若普通 PowerShell 找不到 `cl` 或 `cmake`，使用 “Developer PowerShell for VS 2026”。
 
 ## 构建
 
 ```powershell
-cmake --preset vs2022-x64
+cmake --preset vs2026-x64
 cmake --build --preset debug
 ctest --preset debug
 ```
@@ -237,7 +237,7 @@ ctest --preset debug
 ## 运行
 
 ```powershell
-.\build\vs2022-x64\Debug\cpictures.exe C:\path\to\image.jpg
+.\build\vs2026-x64\Debug\cpictures.exe C:\path\to\image.jpg
 ```
 ```
 
@@ -270,7 +270,7 @@ int main() {
 Run:
 
 ```powershell
-cmake --preset vs2022-x64
+cmake --preset vs2026-x64
 cmake --build --preset debug
 ctest --preset debug
 ```
@@ -1418,7 +1418,7 @@ Run:
 
 ```powershell
 cmake --build --preset debug
-.\build\vs2022-x64\Debug\cpictures.exe C:\Windows\Web\Wallpaper\Windows\img0.jpg
+.\build\vs2026-x64\Debug\cpictures.exe C:\Windows\Web\Wallpaper\Windows\img0.jpg
 ```
 
 Expected:
@@ -1698,7 +1698,7 @@ Run:
 
 ```powershell
 cmake --build --preset debug
-.\build\vs2022-x64\Debug\cpictures.exe C:\Windows\Web\Wallpaper\Windows\img0.jpg
+.\build\vs2026-x64\Debug\cpictures.exe C:\Windows\Web\Wallpaper\Windows\img0.jpg
 ```
 
 Expected:
@@ -1915,7 +1915,7 @@ Run:
 
 ```powershell
 cmake --build --preset debug
-.\build\vs2022-x64\Debug\cpictures.exe C:\Windows\Web\Wallpaper\Windows\img0.jpg
+.\build\vs2026-x64\Debug\cpictures.exe C:\Windows\Web\Wallpaper\Windows\img0.jpg
 ```
 
 Expected:
@@ -2174,7 +2174,7 @@ Run:
 
 ```powershell
 cmake --build --preset debug
-.\build\vs2022-x64\Debug\cpictures.exe C:\Windows\Web\Wallpaper\Windows\img0.jpg
+.\build\vs2026-x64\Debug\cpictures.exe C:\Windows\Web\Wallpaper\Windows\img0.jpg
 ```
 
 Expected:
@@ -2362,7 +2362,7 @@ Run:
 
 ```powershell
 cmake --build --preset debug
-.\build\vs2022-x64\Debug\cpictures.exe C:\path\to\folder\1.jpg
+.\build\vs2026-x64\Debug\cpictures.exe C:\path\to\folder\1.jpg
 ```
 
 Expected:
@@ -2957,7 +2957,7 @@ Append to `README.md`:
 
 ```powershell
 cmake --build --preset release
-cmake --install build\vs2022-x64 --config Release --prefix dist
+cmake --install build\vs2026-x64 --config Release --prefix dist
 ```
 
 再用 WiX 编译 MSI。文件关联必须遵守 Win11 默认应用机制；安装后在系统“默认应用”中选择 cpictures。
@@ -2969,7 +2969,7 @@ Run:
 
 ```powershell
 cmake --build --preset release
-cmake --install build\vs2022-x64 --config Release --prefix dist
+cmake --install build\vs2026-x64 --config Release --prefix dist
 Test-Path dist\bin\cpictures.exe
 ```
 
@@ -3009,14 +3009,14 @@ Create `docs/verification/2026-07-06-cpictures.md`:
 ## 环境
 
 - Windows 11
-- Visual Studio 2022 Build Tools
+- Visual Studio Community 2026 或 Build Tools 2026
 - Windows SDK
-- CMake 3.24+
+- CMake 4.2+
 
 ## 命令
 
 ```powershell
-cmake --preset vs2022-x64
+cmake --preset vs2026-x64
 cmake --build --preset debug
 ctest --preset debug
 cmake --build --preset release
@@ -3051,7 +3051,7 @@ cmake --build --preset release
 Run:
 
 ```powershell
-cmake --preset vs2022-x64
+cmake --preset vs2026-x64
 cmake --build --preset debug
 ctest --preset debug
 cmake --build --preset release

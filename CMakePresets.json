@@ -2,11 +2,11 @@
   "version": 6,
   "configurePresets": [
     {
-      "name": "vs2022-x64",
-      "displayName": "Visual Studio 2022 x64",
-      "generator": "Visual Studio 17 2022",
+      "name": "vs2026-x64",
+      "displayName": "Visual Studio 2026 x64",
+      "generator": "Visual Studio 18 2026",
       "architecture": "x64",
-      "binaryDir": "${sourceDir}/build/vs2022-x64",
+      "binaryDir": "${sourceDir}/build/vs2026-x64",
       "cacheVariables": {
         "CMAKE_INSTALL_PREFIX": "${sourceDir}/dist"
       }
@@ -15,19 +15,19 @@
   "buildPresets": [
     {
       "name": "debug",
-      "configurePreset": "vs2022-x64",
+      "configurePreset": "vs2026-x64",
       "configuration": "Debug"
     },
     {
       "name": "release",
-      "configurePreset": "vs2022-x64",
+      "configurePreset": "vs2026-x64",
       "configuration": "Release"
     }
   ],
   "testPresets": [
     {
       "name": "debug",
-      "configurePreset": "vs2022-x64",
+      "configurePreset": "vs2026-x64",
       "configuration": "Debug",
       "output": {
         "outputOnFailure": true
