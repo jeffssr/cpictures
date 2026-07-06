@@ -2,9 +2,7 @@
 
 日期：2026-07-06
 
-验证提交：`3d5f894a67413d69eafc8d944f3c5eda1ecbe374`
-
-注：后续仅修正验证文档/README 链接，不改变已验证的二进制与测试结果。
+验证提交：`acdc070f0e2098dd91f82a1033dc3d483777a47f`
 
 ## 环境
 
@@ -41,7 +39,12 @@ cmake --build --preset release -- /m:1
 5. `cpictures_codec_abi_c_test`：Passed
 6. `cpictures_update_manifest_tests`：Passed
 
-总测试时间：`0.51 sec`
+总测试时间：`0.44 sec`
+
+## 最终审查修复
+
+- 修复 `0` / 右键 `适应屏幕` 对小图不放大且窗口不扩展的问题。
+- 保持默认打开行为不变：仍为 100% 原图窗口贴合，最大不超过屏幕工作区。
 
 ## 手动验证清单
 
