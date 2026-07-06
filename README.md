@@ -23,3 +23,16 @@ ctest --preset debug
 ```powershell
 .\build\vs2026-x64\Debug\cpictures.exe C:\path\to\image.jpg
 ```
+
+## 安装包
+
+安装布局由 CMake `install()` 生成，包含 `bin\cpictures.exe`、`codecs\` 目录和 `share\cpictures\docs`。
+
+WiX 源文件位于 `installer/wix/cpictures.wxs`，使用 WiX Toolset v4 schema。它只注册应用能力（Capabilities）和文件关联信息，供 Windows 11 的“默认应用”界面识别；安装后仍需在系统“默认应用”里手动选择 cpictures，不能静默抢占默认应用。
+
+生成安装布局：
+
+```powershell
+cmake --build --preset release
+cmake --install build\vs2026-x64 --config Release --prefix dist
+```
