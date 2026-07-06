@@ -259,7 +259,11 @@ void ViewerWindow::ExecuteCommand(Command command) {
 }
 
 void ViewerWindow::LoadCurrentImage() {
-    decoded_ = decoder_.Decode(imageList_.Current());
+    if (auto prefetched = prefetcher_.Take(imageList_.Current())) {
+        decoded_ = std::move(*prefetched);
+    } else {
+        decoded_ = decoder_.Decode(imageList_.Current());
+    }
 
     const SizeI targetSize = FitImageWindow(decoded_.size, WorkAreaForWindow());
     SetWindowPos(hwnd_, nullptr, 0, 0, targetSize.width, targetSize.height, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
@@ -287,6 +291,20 @@ void ViewerWindow::LoadCurrentImage() {
 
     renderer_.EnsureDevice(hwnd_);
     renderer_.SetImage(decoded_);
+    WarmPrefetch();
+}
+
+void ViewerWindow::WarmPrefetch() {
+    if (imageList_.Count() < 2) {
+        prefetcher_.Stop();
+        return;
+    }
+
+    ImageList copy = imageList_;
+    const auto next = copy.Next();
+    copy = imageList_;
+    const auto previous = copy.Previous();
+    prefetcher_.Warm(previous, next);
 }
 
 void ViewerWindow::ShowNextImage() {

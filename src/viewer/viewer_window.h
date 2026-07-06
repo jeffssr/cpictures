@@ -9,6 +9,7 @@
 #include "cpictures/image_list.h"
 #include "cpictures/geometry.h"
 #include "cpictures/view_state.h"
+#include "image/prefetcher.h"
 #include "image/wic_decoder.h"
 #include "render/d2d_renderer.h"
 
@@ -25,6 +26,7 @@ private:
     void Close();
     void ExecuteCommand(Command command);
     void LoadCurrentImage();
+    void WarmPrefetch();
     void ShowNextImage();
     void ShowPreviousImage();
     void ApplyZoom(double factor);
@@ -40,6 +42,7 @@ private:
     HWND hwnd_ = nullptr;
     ImageList imageList_;
     ViewState viewState_;
+    Prefetcher prefetcher_;
     WicDecoder decoder_;
     DecodedImage decoded_;
     D2DRenderer renderer_;

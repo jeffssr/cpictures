@@ -24,6 +24,7 @@ endif()
 add_executable(cpictures WIN32
   src/main.cpp
   src/app/app.cpp
+  src/image/prefetcher.cpp
   src/image/wic_decoder.cpp
   src/platform/clipboard_service.cpp
   src/platform/context_menu.cpp
