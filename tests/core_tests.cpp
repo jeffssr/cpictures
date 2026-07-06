@@ -74,6 +74,29 @@ void TestImageListNaturalOrder() {
     Expect(list.Previous().filename() == L"2.jpg", "previous returns to requested file");
     std::filesystem::remove_all(dir);
 }
+
+void TestImageListSkipsNonImageCurrentFile() {
+    const auto dir = std::filesystem::temp_directory_path() / L"cpictures_list_skip_test";
+    std::filesystem::remove_all(dir);
+    std::filesystem::create_directories(dir);
+    WriteTinyFile(dir / L"notes.txt");
+    WriteTinyFile(dir / L"raw.ext");
+
+    const cpictures::ImageList non_image_list = cpictures::ImageList::LoadFromFile(dir / L"notes.txt");
+    Expect(non_image_list.Empty(), "existing non-image returns empty list");
+    Expect(non_image_list.Count() == 0, "existing non-image count is zero");
+
+    const cpictures::ImageList unsupported_list = cpictures::ImageList::LoadFromFile(dir / L"raw.ext");
+    Expect(unsupported_list.Empty(), "existing unsupported extension returns empty list");
+    Expect(unsupported_list.Count() == 0, "existing unsupported extension count is zero");
+
+    const cpictures::ImageList missing_jpg_list = cpictures::ImageList::LoadFromFile(dir / L"ghost.jpg");
+    Expect(!missing_jpg_list.Empty(), "missing known image still returns list entry");
+    Expect(missing_jpg_list.Count() == 1, "missing known image count is one");
+    Expect(missing_jpg_list.Current().filename() == L"ghost.jpg", "missing known image keeps requested path");
+
+    std::filesystem::remove_all(dir);
+}
 }
 
 int main() {
@@ -82,6 +105,7 @@ int main() {
     TestSupportedFormats();
     TestFitWindow();
     TestImageListNaturalOrder();
+    TestImageListSkipsNonImageCurrentFile();
     std::cout << "cpictures core tests passed\n";
     return 0;
 }

@@ -21,7 +21,13 @@ ImageList ImageList::LoadFromFile(const std::filesystem::path& path) {
     const auto absolute = std::filesystem::absolute(path);
     const auto directory = absolute.parent_path();
     if (!std::filesystem::exists(absolute)) {
+        if (!IsKnownImagePath(absolute)) {
+            return list;
+        }
         list.files_.push_back(absolute);
+        return list;
+    }
+    if (!IsKnownImagePath(absolute)) {
         return list;
     }
     for (const auto& entry : std::filesystem::directory_iterator(directory)) {
