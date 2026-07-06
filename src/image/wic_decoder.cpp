@@ -1,5 +1,6 @@
 #include "image/wic_decoder.h"
 
+#include <limits>
 #include <stdexcept>
 
 #include <objbase.h>
@@ -70,15 +71,29 @@ DecodedImage WicDecoder::Decode(const std::filesystem::path& path) const {
             WICBitmapPaletteTypeCustom),
         "FormatConverter Initialize failed");
 
+    if (width > (std::numeric_limits<UINT>::max)() / 4) {
+        throw std::runtime_error("decoded image stride overflow");
+    }
+
+    const UINT stride = width * 4;
+    const unsigned long long bufferBytes =
+        static_cast<unsigned long long>(stride) * static_cast<unsigned long long>(height);
+    if (bufferBytes > (std::numeric_limits<size_t>::max)()) {
+        throw std::runtime_error("decoded image buffer exceeds size_t");
+    }
+    if (bufferBytes > (std::numeric_limits<UINT>::max)()) {
+        throw std::runtime_error("decoded image buffer exceeds UINT");
+    }
+
     DecodedImage result;
     result.size = {static_cast<int>(width), static_cast<int>(height)};
-    result.stride = width * 4;
-    result.bgra.resize(static_cast<size_t>(result.stride) * height);
+    result.stride = stride;
+    result.bgra.resize(static_cast<size_t>(bufferBytes));
     ThrowIfFailed(
         converter->CopyPixels(
             nullptr,
             result.stride,
-            static_cast<UINT>(result.bgra.size()),
+            static_cast<UINT>(bufferBytes),
             reinterpret_cast<BYTE*>(result.bgra.data())),
         "CopyPixels failed");
     return result;
