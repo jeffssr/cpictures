@@ -8,6 +8,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 option(CPICTURES_BUILD_TESTS "Build cpictures tests" ON)
 
 add_library(cpictures_core STATIC
+  src/image/image_document.cpp
+  src/image/image_list.cpp
   src/image/supported_formats.cpp
   src/platform/path_utils.cpp
   src/platform/window_metrics.cpp
@@ -15,6 +17,9 @@ add_library(cpictures_core STATIC
 target_compile_features(cpictures_core PUBLIC cxx_std_20)
 target_include_directories(cpictures_core PUBLIC include)
 target_compile_definitions(cpictures_core PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
+if(MSVC)
+  target_compile_options(cpictures_core PRIVATE /FS)
+endif()
 
 include(CTest)
 if(BUILD_TESTING AND CPICTURES_BUILD_TESTS)

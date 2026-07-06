@@ -1,6 +1,8 @@
 #include <cstdlib>
 #include <iostream>
 #include <algorithm>
+#include <filesystem>
+#include <fstream>
 #include <string>
 #include <vector>
 
@@ -8,6 +10,7 @@
 #include "cpictures/natural_sort.h"
 #include "cpictures/overlay.h"
 #include "cpictures/supported_formats.h"
+#include "cpictures/image_list.h"
 
 namespace {
 void Expect(bool condition, const char* message) {
@@ -48,6 +51,29 @@ void TestFitWindow() {
     Expect(exact.width == 640, "small image remains 100 percent width");
     Expect(exact.height == 480, "small image remains 100 percent height");
 }
+
+void WriteTinyFile(const std::filesystem::path& path) {
+    std::ofstream out(path, std::ios::binary);
+    out << "x";
+}
+
+void TestImageListNaturalOrder() {
+    const auto dir = std::filesystem::temp_directory_path() / L"cpictures_list_test";
+    std::filesystem::remove_all(dir);
+    std::filesystem::create_directories(dir);
+    WriteTinyFile(dir / L"10.jpg");
+    WriteTinyFile(dir / L"2.jpg");
+    WriteTinyFile(dir / L"1.jpg");
+    WriteTinyFile(dir / L"notes.txt");
+
+    cpictures::ImageList list = cpictures::ImageList::LoadFromFile(dir / L"2.jpg");
+    Expect(list.Count() == 3, "image list counts supported files");
+    Expect(list.Index() == 1, "image list locates current file");
+    Expect(list.Current().filename() == L"2.jpg", "current image is requested file");
+    Expect(list.Next().filename() == L"10.jpg", "next image follows natural order");
+    Expect(list.Previous().filename() == L"2.jpg", "previous returns to requested file");
+    std::filesystem::remove_all(dir);
+}
 }
 
 int main() {
@@ -55,6 +81,7 @@ int main() {
     TestOverlayText();
     TestSupportedFormats();
     TestFitWindow();
+    TestImageListNaturalOrder();
     std::cout << "cpictures core tests passed\n";
     return 0;
 }
