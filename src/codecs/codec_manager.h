@@ -7,6 +7,8 @@
 
 namespace cpictures {
 
+bool IsCodecLibraryExtension(std::wstring_view extension);
+
 struct CodecPluginInfo {
     std::filesystem::path path;
     std::wstring name;

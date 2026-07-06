@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 4.2)
-project(cpictures VERSION 0.1.0 LANGUAGES CXX)
+project(cpictures VERSION 0.1.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -75,4 +75,9 @@ if(BUILD_TESTING AND CPICTURES_BUILD_TESTS)
   target_link_libraries(cpictures_codec_manager_tests PRIVATE cpictures_codecs)
   target_compile_definitions(cpictures_codec_manager_tests PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
   add_test(NAME cpictures_codec_manager_tests COMMAND cpictures_codec_manager_tests)
+
+  add_executable(cpictures_codec_abi_c_test tests/codec_abi_c_test.c)
+  target_include_directories(cpictures_codec_abi_c_test PRIVATE src)
+  target_compile_features(cpictures_codec_abi_c_test PRIVATE c_std_11)
+  add_test(NAME cpictures_codec_abi_c_test COMMAND cpictures_codec_abi_c_test)
 endif()

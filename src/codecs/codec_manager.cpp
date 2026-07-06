@@ -31,6 +31,10 @@ std::vector<std::wstring> SplitExtensions(const wchar_t* value) {
 
 }  // namespace
 
+bool IsCodecLibraryExtension(std::wstring_view extension) {
+    return NormalizeExtension(extension) == L".dll";
+}
+
 CodecManager::CodecManager(std::filesystem::path codecsDirectory)
     : codecsDirectory_(std::move(codecsDirectory)) {}
 
@@ -45,7 +49,7 @@ std::vector<CodecPluginInfo> CodecManager::Discover() const {
         if (error) {
             return {};
         }
-        if (!entry.is_regular_file() || entry.path().extension() != L".dll") {
+        if (!entry.is_regular_file() || !IsCodecLibraryExtension(entry.path().extension().wstring())) {
             continue;
         }
 
