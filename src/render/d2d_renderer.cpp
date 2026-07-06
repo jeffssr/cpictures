@@ -1,6 +1,5 @@
 #include "render/d2d_renderer.h"
 
-#include <algorithm>
 #include <stdexcept>
 
 #include <d2d1helper.h>
@@ -81,10 +80,15 @@ void D2DRenderer::Resize(HWND hwnd) {
 
     RECT client{};
     GetClientRect(hwnd, &client);
+    const HRESULT hr = target_->Resize(D2D1::SizeU(
+        static_cast<UINT32>(std::max(1L, client.right - client.left)),
+        static_cast<UINT32>(std::max(1L, client.bottom - client.top))));
+    if (hr == D2DERR_RECREATE_TARGET) {
+        DiscardDeviceResources();
+        return;
+    }
     ThrowIfFailed(
-        target_->Resize(D2D1::SizeU(
-            static_cast<UINT32>(std::max(1L, client.right - client.left)),
-            static_cast<UINT32>(std::max(1L, client.bottom - client.top)))),
+        hr,
         "ID2D1HwndRenderTarget::Resize failed");
 }
 
@@ -109,11 +113,6 @@ void D2DRenderer::Render(HWND hwnd, const ViewState& state, const std::wstring& 
         float scale = static_cast<float>(state.zoom);
         if (scale <= 0.0f) {
             scale = 1.0f;
-        }
-
-        const float fitScale = std::min(clientSize.width / imageSize.width, clientSize.height / imageSize.height);
-        if (scale > fitScale && fitScale > 0.0f) {
-            scale = fitScale;
         }
 
         const float drawWidth = imageSize.width * scale;

@@ -56,7 +56,14 @@ int ViewerWindow::CreateAndShow(const std::filesystem::path& path) {
         return 1;
     }
 
-    LoadCurrentImage();
+    try {
+        LoadCurrentImage();
+    } catch (const std::exception&) {
+        MessageBoxW(hwnd_, L"cpictures: failed to open image.", L"cpictures", MB_OK | MB_ICONERROR);
+        DestroyWindow(hwnd_);
+        hwnd_ = nullptr;
+        return 1;
+    }
     ShowWindow(hwnd_, showCommand_);
     UpdateWindow(hwnd_);
 
