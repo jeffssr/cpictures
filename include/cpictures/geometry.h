@@ -65,4 +65,22 @@ inline SizeI ScaleImageByZoomToWorkArea(SizeI image, SizeI workArea, double zoom
     return FitImageWindow(zoomed, workArea);
 }
 
+inline SizeI ActualSizeViewport(SizeI image, SizeI workArea) {
+    if (!IsValid(image) || !IsValid(workArea)) {
+        return {};
+    }
+    return {std::min(image.width, workArea.width), std::min(image.height, workArea.height)};
+}
+
+inline bool CanPan(SizeI content, SizeI viewport) {
+    return IsValid(content) && IsValid(viewport) &&
+           (content.width > viewport.width || content.height > viewport.height);
+}
+
+inline PointI ClampPanOffset(PointI pan, SizeI content, SizeI viewport) {
+    const int maxX = std::max(0, content.width - viewport.width);
+    const int maxY = std::max(0, content.height - viewport.height);
+    return {std::clamp(pan.x, 0, maxX), std::clamp(pan.y, 0, maxY)};
+}
+
 }  // namespace cpictures
