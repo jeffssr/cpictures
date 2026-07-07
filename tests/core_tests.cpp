@@ -131,6 +131,25 @@ void TestImageListSingleImageCannotNavigate() {
     std::filesystem::remove_all(dir);
 }
 
+void TestImageListExcludesCandidateFormatsWithoutDecoder() {
+    const auto dir = std::filesystem::temp_directory_path() / L"cpictures_candidate_list_test";
+    std::filesystem::remove_all(dir);
+    std::filesystem::create_directories(dir);
+    WriteTinyFile(dir / L"a.svg");
+    WriteTinyFile(dir / L"b.png");
+    WriteTinyFile(dir / L"c.png");
+
+    cpictures::ImageList list = cpictures::ImageList::LoadFromFile(dir / L"c.png");
+    Expect(list.Count() == 2, "candidate format is not listed before decoder support exists");
+    Expect(list.Current().filename() == L"c.png", "current image remains requested core image");
+    Expect(list.Next().filename() == L"b.png", "next skips candidate format");
+
+    const cpictures::ImageList candidate_list = cpictures::ImageList::LoadFromFile(dir / L"a.svg");
+    Expect(candidate_list.Empty(), "candidate format does not open without decoder support");
+
+    std::filesystem::remove_all(dir);
+}
+
 void TestImageListSkipsNonImageCurrentFile() {
     const auto dir = std::filesystem::temp_directory_path() / L"cpictures_list_skip_test";
     std::filesystem::remove_all(dir);
@@ -162,6 +181,7 @@ int main() {
     TestFitWindow();
     TestImageListNaturalOrder();
     TestImageListSingleImageCannotNavigate();
+    TestImageListExcludesCandidateFormatsWithoutDecoder();
     TestImageListSkipsNonImageCurrentFile();
     std::cout << "cpictures core tests passed\n";
     return 0;
