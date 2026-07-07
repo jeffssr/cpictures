@@ -74,6 +74,11 @@ void D2DRenderer::EnsureDevice(HWND hwnd) {
             D2D1::ColorF(0.0f, 0.0f, 0.0f, 0.34f),
             badgeBrush_.GetAddressOf()),
         "CreateSolidColorBrush badge failed");
+    ThrowIfFailed(
+        target_->CreateSolidColorBrush(
+            D2D1::ColorF(1.0f, 1.0f, 1.0f, 0.35f),
+            frameBrush_.GetAddressOf()),
+        "CreateSolidColorBrush frame failed");
 
     CreateBitmap();
 }
@@ -177,6 +182,13 @@ void D2DRenderer::Render(HWND hwnd, const ViewState& state, const std::wstring& 
             D2D1_DRAW_TEXT_OPTIONS_CLIP);
     }
 
+    if (frameBrush_) {
+        target_->DrawRectangle(
+            D2D1::RectF(0.5f, 0.5f, clientSize.width - 0.5f, clientSize.height - 0.5f),
+            frameBrush_.Get(),
+            1.0f);
+    }
+
     const HRESULT hr = target_->EndDraw();
     if (hr == D2DERR_RECREATE_TARGET) {
         DiscardDeviceResources();
@@ -210,6 +222,7 @@ void D2DRenderer::DiscardDeviceResources() {
     bitmap_.Reset();
     textBrush_.Reset();
     badgeBrush_.Reset();
+    frameBrush_.Reset();
     target_.Reset();
 }
 

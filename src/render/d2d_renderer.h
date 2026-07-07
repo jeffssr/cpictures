@@ -32,6 +32,7 @@ private:
     Microsoft::WRL::ComPtr<ID2D1Bitmap> bitmap_;
     Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> textBrush_;
     Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> badgeBrush_;
+    Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> frameBrush_;
     Microsoft::WRL::ComPtr<IDWriteTextFormat> textFormat_;
 };
 

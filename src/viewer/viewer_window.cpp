@@ -17,8 +17,18 @@ namespace {
 constexpr wchar_t kWindowClassName[] = L"cpictures.viewer";
 
 void ApplyWindowFrameStyle(HWND hwnd) {
+    const DWMNCRENDERINGPOLICY renderingPolicy = DWMNCRP_ENABLED;
+    DwmSetWindowAttribute(
+        hwnd,
+        DWMWA_NCRENDERING_POLICY,
+        &renderingPolicy,
+        sizeof(renderingPolicy));
+
     const COLORREF borderColor = DWMWA_COLOR_DEFAULT;
     DwmSetWindowAttribute(hwnd, DWMWA_BORDER_COLOR, &borderColor, sizeof(borderColor));
+
+    MARGINS margins{1, 1, 1, 1};
+    DwmExtendFrameIntoClientArea(hwnd, &margins);
 }
 
 }  // namespace
@@ -53,7 +63,7 @@ int ViewerWindow::CreateAndShow(const std::filesystem::path& path) {
         WS_EX_APPWINDOW,
         kWindowClassName,
         L"cpictures",
-        WS_POPUP | WS_THICKFRAME,
+        WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT,
         CW_USEDEFAULT,
         960,
