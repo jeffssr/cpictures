@@ -2,13 +2,19 @@
 
 #include <array>
 #include <bcrypt.h>
+#include <cstdio>
 #include <cwctype>
 #include <fstream>
 #include <iomanip>
+#include <optional>
+#include <shlobj.h>
+#include <shellapi.h>
 #include <sstream>
 #include <vector>
+#include <winhttp.h>
 
 #pragma comment(lib, "bcrypt.lib")
+#pragma comment(lib, "winhttp.lib")
 
 namespace cpictures {
 namespace {
@@ -29,6 +35,16 @@ struct ScopedHash {
     ~ScopedHash() {
         if (handle != nullptr) {
             BCryptDestroyHash(handle);
+        }
+    }
+};
+
+struct ScopedInternetHandle {
+    HINTERNET handle = nullptr;
+
+    ~ScopedInternetHandle() {
+        if (handle != nullptr) {
+            WinHttpCloseHandle(handle);
         }
     }
 };
@@ -385,6 +401,254 @@ unsigned long long ReadVersionPart(std::wstring_view value, size_t* pos) {
     return result;
 }
 
+std::wstring Utf8ToWide(const std::string& value) {
+    if (value.empty()) {
+        return L"";
+    }
+    const int length = MultiByteToWideChar(
+        CP_UTF8, MB_ERR_INVALID_CHARS, value.data(), static_cast<int>(value.size()), nullptr, 0);
+    if (length <= 0) {
+        return L"";
+    }
+    std::wstring result(static_cast<size_t>(length), L'\0');
+    MultiByteToWideChar(
+        CP_UTF8, MB_ERR_INVALID_CHARS, value.data(), static_cast<int>(value.size()), result.data(), length);
+    return result;
+}
+
+std::string WideToUtf8(const std::wstring& value) {
+    if (value.empty()) {
+        return "";
+    }
+    const int length = WideCharToMultiByte(
+        CP_UTF8, 0, value.data(), static_cast<int>(value.size()), nullptr, 0, nullptr, nullptr);
+    if (length <= 0) {
+        return "";
+    }
+    std::string result(static_cast<size_t>(length), '\0');
+    WideCharToMultiByte(
+        CP_UTF8, 0, value.data(), static_cast<int>(value.size()), result.data(), length, nullptr, nullptr);
+    return result;
+}
+
+bool CrackUrl(const std::wstring& url, URL_COMPONENTS* components, std::wstring* host, std::wstring* path) {
+    *host = std::wstring(256, L'\0');
+    *path = std::wstring(2048, L'\0');
+
+    *components = {};
+    components->dwStructSize = sizeof(*components);
+    components->lpszHostName = host->data();
+    components->dwHostNameLength = static_cast<DWORD>(host->size());
+    components->lpszUrlPath = path->data();
+    components->dwUrlPathLength = static_cast<DWORD>(path->size());
+    components->dwSchemeLength = static_cast<DWORD>(-1);
+
+    if (!WinHttpCrackUrl(url.c_str(), static_cast<DWORD>(url.size()), 0, components)) {
+        return false;
+    }
+
+    host->resize(components->dwHostNameLength);
+    path->resize(components->dwUrlPathLength);
+    return components->nScheme == INTERNET_SCHEME_HTTP || components->nScheme == INTERNET_SCHEME_HTTPS;
+}
+
+ScopedInternetHandle OpenHttpRequest(const std::wstring& url, const wchar_t* method) {
+    URL_COMPONENTS components{};
+    std::wstring host;
+    std::wstring path;
+    if (!CrackUrl(url, &components, &host, &path)) {
+        return {};
+    }
+
+    ScopedInternetHandle session{WinHttpOpen(
+        L"cpictures/1.0",
+        WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
+        WINHTTP_NO_PROXY_NAME,
+        WINHTTP_NO_PROXY_BYPASS,
+        0)};
+    if (session.handle == nullptr) {
+        return {};
+    }
+
+    ScopedInternetHandle connection{WinHttpConnect(session.handle, host.c_str(), components.nPort, 0)};
+    if (connection.handle == nullptr) {
+        return {};
+    }
+
+    const DWORD flags = components.nScheme == INTERNET_SCHEME_HTTPS ? WINHTTP_FLAG_SECURE : 0;
+    ScopedInternetHandle request{WinHttpOpenRequest(
+        connection.handle,
+        method,
+        path.c_str(),
+        nullptr,
+        WINHTTP_NO_REFERER,
+        WINHTTP_DEFAULT_ACCEPT_TYPES,
+        flags)};
+    if (request.handle == nullptr) {
+        return {};
+    }
+
+    const DWORD redirectPolicy = WINHTTP_OPTION_REDIRECT_POLICY_ALWAYS;
+    WinHttpSetOption(
+        request.handle,
+        WINHTTP_OPTION_REDIRECT_POLICY,
+        const_cast<DWORD*>(&redirectPolicy),
+        sizeof(redirectPolicy));
+
+    connection.handle = nullptr;
+    session.handle = nullptr;
+    return request;
+}
+
+bool SendHttpRequest(HINTERNET request, const wchar_t* headers) {
+    if (!WinHttpSendRequest(
+            request,
+            headers,
+            headers != nullptr ? static_cast<DWORD>(-1L) : 0,
+            WINHTTP_NO_REQUEST_DATA,
+            0,
+            0,
+            0)) {
+        return false;
+    }
+    return WinHttpReceiveResponse(request, nullptr) != FALSE;
+}
+
+DWORD QueryStatusCode(HINTERNET request) {
+    DWORD status = 0;
+    DWORD size = sizeof(status);
+    if (!WinHttpQueryHeaders(
+            request,
+            WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+            WINHTTP_HEADER_NAME_BY_INDEX,
+            &status,
+            &size,
+            WINHTTP_NO_HEADER_INDEX)) {
+        return 0;
+    }
+    return status;
+}
+
+bool ReadHttpBytes(HINTERNET request, std::vector<unsigned char>* bytes, std::ofstream* file) {
+    while (true) {
+        DWORD available = 0;
+        if (!WinHttpQueryDataAvailable(request, &available)) {
+            return false;
+        }
+        if (available == 0) {
+            return true;
+        }
+
+        std::vector<unsigned char> buffer(available);
+        DWORD read = 0;
+        if (!WinHttpReadData(request, buffer.data(), available, &read)) {
+            return false;
+        }
+        if (read == 0) {
+            return true;
+        }
+        if (file != nullptr) {
+            file->write(reinterpret_cast<const char*>(buffer.data()), read);
+            if (!*file) {
+                return false;
+            }
+        } else {
+            bytes->insert(bytes->end(), buffer.begin(), buffer.begin() + read);
+        }
+    }
+}
+
+std::optional<std::wstring> HttpGetText(const wchar_t* url) {
+    ScopedInternetHandle request = OpenHttpRequest(url, L"GET");
+    if (request.handle == nullptr) {
+        return std::nullopt;
+    }
+
+    constexpr wchar_t kHeaders[] =
+        L"Accept: application/vnd.github+json\r\n"
+        L"User-Agent: cpictures\r\n";
+    if (!SendHttpRequest(request.handle, kHeaders) || QueryStatusCode(request.handle) != 200) {
+        return std::nullopt;
+    }
+
+    std::vector<unsigned char> bytes;
+    if (!ReadHttpBytes(request.handle, &bytes, nullptr)) {
+        return std::nullopt;
+    }
+
+    const std::string utf8(bytes.begin(), bytes.end());
+    std::wstring text = Utf8ToWide(utf8);
+    if (text.empty() && !utf8.empty()) {
+        return std::nullopt;
+    }
+    return text;
+}
+
+bool DownloadFile(const std::wstring& url, const std::filesystem::path& path) {
+    ScopedInternetHandle request = OpenHttpRequest(url, L"GET");
+    if (request.handle == nullptr) {
+        return false;
+    }
+
+    constexpr wchar_t kHeaders[] = L"User-Agent: cpictures\r\n";
+    if (!SendHttpRequest(request.handle, kHeaders)) {
+        return false;
+    }
+
+    const DWORD status = QueryStatusCode(request.handle);
+    if (status < 200 || status >= 300) {
+        return false;
+    }
+
+    std::filesystem::create_directories(path.parent_path());
+    std::ofstream file(path, std::ios::binary);
+    if (!file) {
+        return false;
+    }
+    std::vector<unsigned char> unused;
+    return ReadHttpBytes(request.handle, &unused, &file);
+}
+
+std::wstring CurrentVersion() {
+#ifdef CPICTURES_VERSION
+    return CPICTURES_VERSION;
+#else
+    return L"0.1.0";
+#endif
+}
+
+std::filesystem::path UpdateDownloadPath(const std::wstring& fileName) {
+    PWSTR tempPath = nullptr;
+    std::filesystem::path directory;
+    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &tempPath)) && tempPath != nullptr) {
+        directory = std::filesystem::path(tempPath) / L"Temp" / L"cpictures-update";
+        CoTaskMemFree(tempPath);
+    } else {
+        wchar_t buffer[MAX_PATH]{};
+        const DWORD length = GetTempPathW(static_cast<DWORD>(std::size(buffer)), buffer);
+        directory = length > 0 ? std::filesystem::path(buffer) / L"cpictures-update"
+                               : std::filesystem::temp_directory_path() / L"cpictures-update";
+    }
+    return directory / fileName;
+}
+
+bool LaunchInstaller(const std::filesystem::path& path) {
+    const std::wstring parameters = L"/i \"" + path.wstring() + L"\"";
+    const HINSTANCE result = ShellExecuteW(
+        nullptr,
+        L"open",
+        L"msiexec.exe",
+        parameters.c_str(),
+        nullptr,
+        SW_SHOWNORMAL);
+    return reinterpret_cast<INT_PTR>(result) > 32;
+}
+
+std::wstring NewVersionMessage(const std::wstring& tagName) {
+    return L"\x53D1\x73B0\x65B0\x7248\x672C " + tagName +
+           L"\xFF0C\x662F\x5426\x4E0B\x8F7D\x5E76\x5B89\x88C5\xFF1F";
+}
+
 }  // namespace
 
 int CompareVersions(std::wstring_view left, std::wstring_view right) {
@@ -540,6 +804,52 @@ void ShowFormatSupportDialog(HWND owner) {
         L"\x5F53\x524D\x7248\x672C\x53EA\x63D0\x4F9B\x5165\x53E3\x8BF4\x660E\xFF0C\x4E0D\x4F1A\x81EA\x52A8\x4E0B\x8F7D\x6216\x66F4\x65B0\x3002",
         L"\x5B89\x88C5/\x66F4\x65B0\x683C\x5F0F\x652F\x6301",
         MB_OK | MB_ICONINFORMATION);
+}
+
+void CheckForUpdates(HWND owner) {
+    MessageBoxW(
+        owner,
+        L"\x6B63\x5728\x68C0\x67E5\x66F4\x65B0...",
+        L"cpictures",
+        MB_OK | MB_ICONINFORMATION);
+
+    const auto json = HttpGetText(L"https://api.github.com/repos/jeffssr/cpictures/releases/latest");
+    if (!json) {
+        MessageBoxW(owner, L"\x68C0\x67E5\x66F4\x65B0\x5931\x8D25\x3002", L"cpictures", MB_OK | MB_ICONERROR);
+        return;
+    }
+
+    const ReleaseInfo release = ParseLatestRelease(*json);
+    if (release.tagName.empty()) {
+        MessageBoxW(owner, L"\x68C0\x67E5\x66F4\x65B0\x5931\x8D25\x3002", L"cpictures", MB_OK | MB_ICONERROR);
+        return;
+    }
+
+    if (!IsNewerVersion(release.tagName, CurrentVersion())) {
+        MessageBoxW(owner, L"\x5DF2\x662F\x6700\x65B0\x7248\x672C\x3002", L"cpictures", MB_OK | MB_ICONINFORMATION);
+        return;
+    }
+
+    if (release.installer.downloadUrl.empty()) {
+        MessageBoxW(owner, L"\x672A\x627E\x5230\x5B89\x88C5\x5305\x3002", L"cpictures", MB_OK | MB_ICONERROR);
+        return;
+    }
+
+    const std::wstring question = NewVersionMessage(release.tagName);
+    const int answer = MessageBoxW(owner, question.c_str(), L"cpictures", MB_YESNO | MB_ICONQUESTION);
+    if (answer != IDYES) {
+        return;
+    }
+
+    const std::filesystem::path downloadPath = UpdateDownloadPath(release.installer.name);
+    if (!DownloadFile(release.installer.downloadUrl, downloadPath)) {
+        MessageBoxW(owner, L"\x4E0B\x8F7D\x5931\x8D25\x3002", L"cpictures", MB_OK | MB_ICONERROR);
+        return;
+    }
+
+    if (!LaunchInstaller(downloadPath)) {
+        MessageBoxW(owner, L"\x542F\x52A8\x5B89\x88C5\x5931\x8D25\x3002", L"cpictures", MB_OK | MB_ICONERROR);
+    }
 }
 
 }  // namespace cpictures

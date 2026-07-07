@@ -24,5 +24,6 @@ bool IsNewerVersion(std::wstring_view remote, std::wstring_view local);
 ReleaseInfo ParseLatestRelease(const std::wstring& jsonText);
 std::wstring ComputeSha256(const std::filesystem::path& path);
 void ShowFormatSupportDialog(HWND owner);
+void CheckForUpdates(HWND owner);
 
 }  // namespace cpictures
