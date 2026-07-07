@@ -46,6 +46,7 @@ int ViewerWindow::CreateAndShow(const std::filesystem::path& path) {
 
     WNDCLASSEXW wc{};
     wc.cbSize = sizeof(wc);
+    wc.style = CS_DBLCLKS;
     wc.hInstance = instance_;
     wc.lpfnWndProc = ViewerWindow::WindowProc;
     wc.lpszClassName = kWindowClassName;
@@ -191,6 +192,11 @@ LRESULT ViewerWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) 
         leftButtonDown_ = true;
         leftButtonDownPoint_ = {GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
         SetCapture(hwnd_);
+        return 0;
+    case WM_LBUTTONDBLCLK:
+        leftButtonDown_ = false;
+        ReleaseCapture();
+        ToggleFullscreen();
         return 0;
     case WM_MOUSEMOVE:
         if (leftButtonDown_ && (wparam & MK_LBUTTON) != 0) {
