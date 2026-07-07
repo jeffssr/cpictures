@@ -2,6 +2,7 @@
 
 #include <array>
 #include <bcrypt.h>
+#include <cwctype>
 #include <fstream>
 #include <iomanip>
 #include <sstream>
@@ -44,7 +45,426 @@ bool QueryDword(BCRYPT_ALG_HANDLE algorithm, const wchar_t* property, DWORD* val
            cbResult == sizeof(*value);
 }
 
+void SkipWhitespace(const std::wstring& text, size_t* pos) {
+    while (*pos < text.size() && iswspace(text[*pos]) != 0) {
+        ++(*pos);
+    }
+}
+
+bool ConsumeChar(const std::wstring& text, size_t* pos, wchar_t expected) {
+    SkipWhitespace(text, pos);
+    if (*pos >= text.size() || text[*pos] != expected) {
+        return false;
+    }
+    ++(*pos);
+    return true;
+}
+
+bool ParseHexDigit(wchar_t ch, unsigned int* value) {
+    if (ch >= L'0' && ch <= L'9') {
+        *value = static_cast<unsigned int>(ch - L'0');
+        return true;
+    }
+    if (ch >= L'a' && ch <= L'f') {
+        *value = static_cast<unsigned int>(ch - L'a' + 10);
+        return true;
+    }
+    if (ch >= L'A' && ch <= L'F') {
+        *value = static_cast<unsigned int>(ch - L'A' + 10);
+        return true;
+    }
+    return false;
+}
+
+bool ParseJsonString(const std::wstring& text, size_t* pos, std::wstring* out) {
+    SkipWhitespace(text, pos);
+    if (*pos >= text.size() || text[*pos] != L'"') {
+        return false;
+    }
+
+    ++(*pos);
+    std::wstring result;
+    while (*pos < text.size()) {
+        const wchar_t ch = text[*pos];
+        ++(*pos);
+        if (ch == L'"') {
+            *out = std::move(result);
+            return true;
+        }
+        if (ch == L'\\') {
+            if (*pos >= text.size()) {
+                return false;
+            }
+            const wchar_t escaped = text[*pos];
+            ++(*pos);
+            switch (escaped) {
+            case L'"':
+            case L'\\':
+            case L'/':
+                result.push_back(escaped);
+                break;
+            case L'b':
+                result.push_back(L'\b');
+                break;
+            case L'f':
+                result.push_back(L'\f');
+                break;
+            case L'n':
+                result.push_back(L'\n');
+                break;
+            case L'r':
+                result.push_back(L'\r');
+                break;
+            case L't':
+                result.push_back(L'\t');
+                break;
+            case L'u': {
+                unsigned int codePoint = 0;
+                for (int i = 0; i < 4; ++i) {
+                    if (*pos >= text.size()) {
+                        return false;
+                    }
+                    unsigned int hex = 0;
+                    if (!ParseHexDigit(text[*pos], &hex)) {
+                        return false;
+                    }
+                    codePoint = (codePoint << 4) | hex;
+                    ++(*pos);
+                }
+                result.push_back(static_cast<wchar_t>(codePoint));
+                break;
+            }
+            default:
+                return false;
+            }
+            continue;
+        }
+        result.push_back(ch);
+    }
+    return false;
+}
+
+bool ParseUnsignedLongLong(const std::wstring& text, size_t* pos, unsigned long long* out) {
+    SkipWhitespace(text, pos);
+    const size_t start = *pos;
+    unsigned long long value = 0;
+    while (*pos < text.size() && iswdigit(text[*pos]) != 0) {
+        const unsigned int digit = static_cast<unsigned int>(text[*pos] - L'0');
+        constexpr unsigned long long kMaxValue = ~0ULL;
+        if (value > (kMaxValue - digit) / 10) {
+            return false;
+        }
+        value = (value * 10) + digit;
+        ++(*pos);
+    }
+    if (start == *pos) {
+        return false;
+    }
+    *out = value;
+    return true;
+}
+
+void SkipJsonValue(const std::wstring& text, size_t* pos);
+
+void SkipJsonArray(const std::wstring& text, size_t* pos) {
+    if (!ConsumeChar(text, pos, L'[')) {
+        return;
+    }
+    SkipWhitespace(text, pos);
+    if (*pos < text.size() && text[*pos] == L']') {
+        ++(*pos);
+        return;
+    }
+    while (*pos < text.size()) {
+        SkipJsonValue(text, pos);
+        SkipWhitespace(text, pos);
+        if (*pos < text.size() && text[*pos] == L',') {
+            ++(*pos);
+            continue;
+        }
+        if (*pos < text.size() && text[*pos] == L']') {
+            ++(*pos);
+        }
+        return;
+    }
+}
+
+void SkipJsonObject(const std::wstring& text, size_t* pos) {
+    if (!ConsumeChar(text, pos, L'{')) {
+        return;
+    }
+    SkipWhitespace(text, pos);
+    if (*pos < text.size() && text[*pos] == L'}') {
+        ++(*pos);
+        return;
+    }
+    while (*pos < text.size()) {
+        std::wstring key;
+        if (!ParseJsonString(text, pos, &key) || !ConsumeChar(text, pos, L':')) {
+            return;
+        }
+        SkipJsonValue(text, pos);
+        SkipWhitespace(text, pos);
+        if (*pos < text.size() && text[*pos] == L',') {
+            ++(*pos);
+            continue;
+        }
+        if (*pos < text.size() && text[*pos] == L'}') {
+            ++(*pos);
+        }
+        return;
+    }
+}
+
+void SkipJsonValue(const std::wstring& text, size_t* pos) {
+    SkipWhitespace(text, pos);
+    if (*pos >= text.size()) {
+        return;
+    }
+    switch (text[*pos]) {
+    case L'{':
+        SkipJsonObject(text, pos);
+        return;
+    case L'[':
+        SkipJsonArray(text, pos);
+        return;
+    case L'"': {
+        std::wstring ignored;
+        ParseJsonString(text, pos, &ignored);
+        return;
+    }
+    default:
+        while (*pos < text.size()) {
+            const wchar_t ch = text[*pos];
+            if (ch == L',' || ch == L']' || ch == L'}' || iswspace(ch) != 0) {
+                return;
+            }
+            ++(*pos);
+        }
+        return;
+    }
+}
+
+std::wstring ToLower(std::wstring value) {
+    for (wchar_t& ch : value) {
+        ch = static_cast<wchar_t>(towlower(ch));
+    }
+    return value;
+}
+
+bool EndsWith(std::wstring_view value, std::wstring_view suffix) {
+    return value.size() >= suffix.size() &&
+           value.compare(value.size() - suffix.size(), suffix.size(), suffix) == 0;
+}
+
+bool StartsWith(std::wstring_view value, std::wstring_view prefix) {
+    return value.size() >= prefix.size() && value.compare(0, prefix.size(), prefix) == 0;
+}
+
+bool IsPreferredInstaller(const ReleaseAsset& asset) {
+    const std::wstring lowerName = ToLower(asset.name);
+    return StartsWith(lowerName, L"cpictures-") && EndsWith(lowerName, L".msi") &&
+           !asset.downloadUrl.empty();
+}
+
+bool IsInstaller(const ReleaseAsset& asset) {
+    const std::wstring lowerName = ToLower(asset.name);
+    return EndsWith(lowerName, L".msi") && !asset.downloadUrl.empty();
+}
+
+bool ParseReleaseAsset(const std::wstring& text, size_t* pos, ReleaseAsset* asset) {
+    if (!ConsumeChar(text, pos, L'{')) {
+        return false;
+    }
+    SkipWhitespace(text, pos);
+    if (*pos < text.size() && text[*pos] == L'}') {
+        ++(*pos);
+        return true;
+    }
+
+    while (*pos < text.size()) {
+        std::wstring key;
+        if (!ParseJsonString(text, pos, &key) || !ConsumeChar(text, pos, L':')) {
+            return false;
+        }
+
+        if (key == L"name") {
+            if (!ParseJsonString(text, pos, &asset->name)) {
+                return false;
+            }
+        } else if (key == L"browser_download_url") {
+            if (!ParseJsonString(text, pos, &asset->downloadUrl)) {
+                return false;
+            }
+        } else if (key == L"digest") {
+            if (!ParseJsonString(text, pos, &asset->digest)) {
+                return false;
+            }
+        } else if (key == L"size") {
+            if (!ParseUnsignedLongLong(text, pos, &asset->size)) {
+                return false;
+            }
+        } else {
+            SkipJsonValue(text, pos);
+        }
+
+        SkipWhitespace(text, pos);
+        if (*pos < text.size() && text[*pos] == L',') {
+            ++(*pos);
+            continue;
+        }
+        if (*pos < text.size() && text[*pos] == L'}') {
+            ++(*pos);
+            return true;
+        }
+        return false;
+    }
+    return false;
+}
+
+bool ParseReleaseAssets(const std::wstring& text, size_t* pos, ReleaseAsset* selected) {
+    if (!ConsumeChar(text, pos, L'[')) {
+        return false;
+    }
+    SkipWhitespace(text, pos);
+    if (*pos < text.size() && text[*pos] == L']') {
+        ++(*pos);
+        return true;
+    }
+
+    ReleaseAsset fallback;
+    while (*pos < text.size()) {
+        ReleaseAsset asset;
+        if (!ParseReleaseAsset(text, pos, &asset)) {
+            return false;
+        }
+        if (IsPreferredInstaller(asset)) {
+            *selected = std::move(asset);
+        } else if (selected->name.empty() && fallback.name.empty() && IsInstaller(asset)) {
+            fallback = std::move(asset);
+        }
+
+        SkipWhitespace(text, pos);
+        if (*pos < text.size() && text[*pos] == L',') {
+            ++(*pos);
+            continue;
+        }
+        if (*pos < text.size() && text[*pos] == L']') {
+            ++(*pos);
+            if (selected->name.empty()) {
+                *selected = std::move(fallback);
+            }
+            return true;
+        }
+        return false;
+    }
+    return false;
+}
+
+std::wstring_view TrimVersionPrefix(std::wstring_view value) {
+    while (!value.empty() && iswspace(value.front()) != 0) {
+        value.remove_prefix(1);
+    }
+    if (!value.empty() && (value.front() == L'v' || value.front() == L'V')) {
+        value.remove_prefix(1);
+    }
+    return value;
+}
+
+unsigned long long ReadVersionPart(std::wstring_view value, size_t* pos) {
+    unsigned long long result = 0;
+    while (*pos < value.size() && value[*pos] >= L'0' && value[*pos] <= L'9') {
+        const unsigned int digit = static_cast<unsigned int>(value[*pos] - L'0');
+        constexpr unsigned long long kMaxValue = ~0ULL;
+        if (result > (kMaxValue - digit) / 10) {
+            return kMaxValue;
+        }
+        result = (result * 10) + digit;
+        ++(*pos);
+    }
+    return result;
+}
+
 }  // namespace
+
+int CompareVersions(std::wstring_view left, std::wstring_view right) {
+    left = TrimVersionPrefix(left);
+    right = TrimVersionPrefix(right);
+
+    size_t leftPos = 0;
+    size_t rightPos = 0;
+    while (leftPos < left.size() || rightPos < right.size()) {
+        const unsigned long long leftPart = ReadVersionPart(left, &leftPos);
+        const unsigned long long rightPart = ReadVersionPart(right, &rightPos);
+        if (leftPart < rightPart) {
+            return -1;
+        }
+        if (leftPart > rightPart) {
+            return 1;
+        }
+        if (leftPos < left.size() && left[leftPos] == L'.') {
+            ++leftPos;
+        }
+        if (rightPos < right.size() && right[rightPos] == L'.') {
+            ++rightPos;
+        }
+        while (leftPos < left.size() && left[leftPos] != L'.' && !iswdigit(left[leftPos])) {
+            ++leftPos;
+        }
+        while (rightPos < right.size() && right[rightPos] != L'.' && !iswdigit(right[rightPos])) {
+            ++rightPos;
+        }
+    }
+    return 0;
+}
+
+bool IsNewerVersion(std::wstring_view remote, std::wstring_view local) {
+    return CompareVersions(remote, local) > 0;
+}
+
+ReleaseInfo ParseLatestRelease(const std::wstring& jsonText) {
+    ReleaseInfo release;
+    size_t pos = 0;
+    if (!ConsumeChar(jsonText, &pos, L'{')) {
+        return release;
+    }
+
+    SkipWhitespace(jsonText, &pos);
+    if (pos < jsonText.size() && jsonText[pos] == L'}') {
+        return release;
+    }
+
+    while (pos < jsonText.size()) {
+        std::wstring key;
+        if (!ParseJsonString(jsonText, &pos, &key) || !ConsumeChar(jsonText, &pos, L':')) {
+            return ReleaseInfo{};
+        }
+
+        if (key == L"tag_name") {
+            if (!ParseJsonString(jsonText, &pos, &release.tagName)) {
+                return ReleaseInfo{};
+            }
+        } else if (key == L"assets") {
+            if (!ParseReleaseAssets(jsonText, &pos, &release.installer)) {
+                return ReleaseInfo{};
+            }
+        } else {
+            SkipJsonValue(jsonText, &pos);
+        }
+
+        SkipWhitespace(jsonText, &pos);
+        if (pos < jsonText.size() && jsonText[pos] == L',') {
+            ++pos;
+            continue;
+        }
+        if (pos < jsonText.size() && jsonText[pos] == L'}') {
+            break;
+        }
+        return ReleaseInfo{};
+    }
+
+    return release;
+}
 
 std::wstring ComputeSha256(const std::filesystem::path& path) {
     std::ifstream input(path, std::ios::binary);
