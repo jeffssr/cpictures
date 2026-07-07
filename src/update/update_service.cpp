@@ -323,6 +323,15 @@ bool IsInstaller(const ReleaseAsset& asset) {
     return EndsWith(lowerName, L".msi") && !asset.downloadUrl.empty();
 }
 
+std::wstring NormalizeSha256Digest(std::wstring digest) {
+    digest = ToLower(std::move(digest));
+    constexpr std::wstring_view prefix = L"sha256:";
+    if (StartsWith(digest, prefix)) {
+        digest.erase(0, prefix.size());
+    }
+    return digest;
+}
+
 bool ParseReleaseAsset(const std::wstring& text, size_t* pos, ReleaseAsset* asset) {
     if (!ConsumeChar(text, pos, L'{')) {
         return false;
@@ -823,6 +832,20 @@ std::wstring ComputeSha256(const std::filesystem::path& path) {
     return out.str();
 }
 
+bool VerifySha256Digest(const std::filesystem::path& path, const std::wstring& digest) {
+    if (digest.empty()) {
+        return true;
+    }
+
+    const std::wstring expected = NormalizeSha256Digest(digest);
+    if (expected.empty()) {
+        return false;
+    }
+
+    const std::wstring actual = ComputeSha256(path);
+    return !actual.empty() && actual == expected;
+}
+
 void ShowFormatSupportDialog(HWND owner) {
     MessageBoxW(
         owner,
@@ -868,6 +891,11 @@ void CheckForUpdates(HWND owner) {
     const std::filesystem::path downloadPath = UpdateDownloadPath(release.installer.name);
     if (!DownloadFile(release.installer.downloadUrl, downloadPath)) {
         MessageBoxW(owner, L"\x4E0B\x8F7D\x5931\x8D25\x3002", L"cpictures", MB_OK | MB_ICONERROR);
+        return;
+    }
+
+    if (!VerifySha256Digest(downloadPath, release.installer.digest)) {
+        MessageBoxW(owner, L"\x5B89\x88C5\x5305\x6821\x9A8C\x5931\x8D25\x3002", L"cpictures", MB_OK | MB_ICONERROR);
         return;
     }
 

@@ -121,6 +121,22 @@ void TestSha256MissingFileReturnsEmpty() {
     Expect(cpictures::ComputeSha256(path).empty(), "sha256 missing file");
 }
 
+void TestVerifySha256DigestAcceptsGithubDigestFormat() {
+    const std::filesystem::path path =
+        std::filesystem::temp_directory_path() / L"cpictures_sha256_digest_abc.txt";
+    {
+        std::ofstream out(path, std::ios::binary);
+        out << "abc";
+    }
+
+    Expect(cpictures::VerifySha256Digest(
+               path,
+               L"sha256:BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD"),
+           "sha256 digest accepts GitHub format");
+    Expect(!cpictures::VerifySha256Digest(path, L"sha256:0000"), "sha256 digest rejects mismatch");
+    std::filesystem::remove(path);
+}
+
 }  // namespace
 
 int main() {
@@ -133,6 +149,7 @@ int main() {
     TestLatestReleaseWithoutMsiReturnsEmptyInstaller();
     TestSha256KnownValue();
     TestSha256MissingFileReturnsEmpty();
+    TestVerifySha256DigestAcceptsGithubDigestFormat();
     std::cout << "update manifest tests passed\n";
     return 0;
 }
