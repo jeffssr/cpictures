@@ -66,6 +66,33 @@ void TestFitWindow() {
     const cpictures::SizeI hugeZoom = cpictures::ScaleImageByZoomToWorkArea(image, work, 2.0);
     Expect(hugeZoom.width == 1440, "zoomed large image remains bounded width");
     Expect(hugeZoom.height == 1080, "zoomed large image remains bounded height");
+
+    const cpictures::SizeI tall{800, 4000};
+    const cpictures::SizeI tallViewport = cpictures::ActualSizeViewport(tall, work);
+    Expect(tallViewport.width == 800, "tall image keeps 100 percent width");
+    Expect(tallViewport.height == 1080, "tall image caps viewport height");
+
+    const cpictures::SizeI wide{4000, 800};
+    const cpictures::SizeI wideViewport = cpictures::ActualSizeViewport(wide, work);
+    Expect(wideViewport.width == 1920, "wide image caps viewport width");
+    Expect(wideViewport.height == 800, "wide image keeps 100 percent height");
+
+    const cpictures::SizeI hugeViewport = cpictures::ActualSizeViewport(image, work);
+    Expect(hugeViewport.width == 1920, "huge image caps viewport width");
+    Expect(hugeViewport.height == 1080, "huge image caps viewport height");
+
+    const cpictures::PointI clamped = cpictures::ClampPanOffset({900, -20}, {4000, 3000}, work);
+    Expect(clamped.x == 900, "pan x inside range");
+    Expect(clamped.y == 0, "pan y clamps to zero");
+
+    const cpictures::PointI maxPan = cpictures::ClampPanOffset({9999, 9999}, {4000, 3000}, work);
+    Expect(maxPan.x == 2080, "pan x clamps to max");
+    Expect(maxPan.y == 1920, "pan y clamps to max");
+
+    const cpictures::SizeI correctedWindow =
+        cpictures::CorrectWindowSizeForClient({320, 1080}, {182, 980}, {320, 1080});
+    Expect(correctedWindow.width == 458, "window width expands to preserve target client");
+    Expect(correctedWindow.height == 1180, "window height expands to preserve target client");
 }
 
 void WriteTinyFile(const std::filesystem::path& path) {

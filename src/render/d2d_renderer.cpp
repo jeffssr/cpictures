@@ -131,11 +131,13 @@ void D2DRenderer::Render(HWND hwnd, const ViewState& state, const std::wstring& 
         const auto interpolation =
             exactPixelScale ? D2D1_BITMAP_INTERPOLATION_MODE_NEAREST_NEIGHBOR
                             : D2D1_BITMAP_INTERPOLATION_MODE_LINEAR;
-        const D2D1_RECT_F destination = D2D1::RectF(
-            (clientSize.width - drawWidth) * 0.5f,
-            (clientSize.height - drawHeight) * 0.5f,
-            (clientSize.width + drawWidth) * 0.5f,
-            (clientSize.height + drawHeight) * 0.5f);
+        const float left = drawWidth > clientSize.width
+            ? -static_cast<float>(state.panX)
+            : (clientSize.width - drawWidth) * 0.5f;
+        const float top = drawHeight > clientSize.height
+            ? -static_cast<float>(state.panY)
+            : (clientSize.height - drawHeight) * 0.5f;
+        const D2D1_RECT_F destination = D2D1::RectF(left, top, left + drawWidth, top + drawHeight);
         D2D1_MATRIX_3X2_F originalTransform{};
         target_->GetTransform(&originalTransform);
         const D2D1_POINT_2F center = D2D1::Point2F(clientSize.width * 0.5f, clientSize.height * 0.5f);

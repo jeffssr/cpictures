@@ -9,6 +9,8 @@ enum class FitMode {
 
 struct ViewState {
     double zoom = 1.0;
+    int panX = 0;
+    int panY = 0;
     int rotationDegrees = 0;
     bool overlayVisible = false;
     bool fullscreen = false;
