@@ -36,6 +36,7 @@ private:
     void SetFitToScreen();
     void ToggleFullscreen();
     void RotateBy(int degrees);
+    void ToggleOverlay();
     SizeI WorkAreaForWindow() const;
     std::wstring OverlayText() const;
 
@@ -50,6 +51,8 @@ private:
     D2DRenderer renderer_;
     RECT restoreRect_{};
     bool hasRestoreRect_ = false;
+    LONG_PTR restoreStyle_ = 0;
+    LONG_PTR restoreExStyle_ = 0;
     bool leftButtonDown_ = false;
     POINT leftButtonDownPoint_{};
 };

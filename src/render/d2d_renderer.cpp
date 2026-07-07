@@ -182,7 +182,7 @@ void D2DRenderer::Render(HWND hwnd, const ViewState& state, const std::wstring& 
             D2D1_DRAW_TEXT_OPTIONS_CLIP);
     }
 
-    if (frameBrush_) {
+    if (frameBrush_ && !state.fullscreen) {
         target_->DrawRectangle(
             D2D1::RectF(0.5f, 0.5f, clientSize.width - 0.5f, clientSize.height - 0.5f),
             frameBrush_.Get(),

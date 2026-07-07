@@ -16,6 +16,7 @@ namespace cpictures {
 namespace {
 
 constexpr wchar_t kWindowClassName[] = L"cpictures.viewer";
+constexpr UINT_PTR kOverlayClickTimer = 1;
 
 void ApplyWindowFrameStyle(HWND hwnd) {
     const DWMNCRENDERINGPOLICY renderingPolicy = DWMNCRP_ENABLED;
@@ -196,6 +197,7 @@ LRESULT ViewerWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) 
     case WM_LBUTTONDBLCLK:
         leftButtonDown_ = false;
         ReleaseCapture();
+        KillTimer(hwnd_, kOverlayClickTimer);
         ToggleFullscreen();
         return 0;
     case WM_MOUSEMOVE:
@@ -207,6 +209,7 @@ LRESULT ViewerWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) 
             if (std::abs(dx) >= thresholdX || std::abs(dy) >= thresholdY) {
                 leftButtonDown_ = false;
                 ReleaseCapture();
+                KillTimer(hwnd_, kOverlayClickTimer);
                 POINT point{};
                 GetCursorPos(&point);
                 SendMessageW(hwnd_, WM_NCLBUTTONDOWN, HTCAPTION, MAKELPARAM(point.x, point.y));
@@ -217,10 +220,16 @@ LRESULT ViewerWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) 
         if (leftButtonDown_) {
             leftButtonDown_ = false;
             ReleaseCapture();
-            viewState_.overlayVisible = !viewState_.overlayVisible;
-            InvalidateRect(hwnd_, nullptr, FALSE);
+            SetTimer(hwnd_, kOverlayClickTimer, GetDoubleClickTime(), nullptr);
         }
         return 0;
+    case WM_TIMER:
+        if (wparam == kOverlayClickTimer) {
+            KillTimer(hwnd_, kOverlayClickTimer);
+            ToggleOverlay();
+            return 0;
+        }
+        break;
     case WM_MOUSEWHEEL: {
         const short delta = GET_WHEEL_DELTA_WPARAM(wparam);
         if ((GET_KEYSTATE_WPARAM(wparam) & MK_CONTROL) != 0) {
@@ -454,10 +463,14 @@ void ViewerWindow::ToggleFullscreen() {
     if (!viewState_.fullscreen) {
         GetWindowRect(hwnd_, &restoreRect_);
         hasRestoreRect_ = true;
+        restoreStyle_ = GetWindowLongPtrW(hwnd_, GWL_STYLE);
+        restoreExStyle_ = GetWindowLongPtrW(hwnd_, GWL_EXSTYLE);
 
         HMONITOR monitor = MonitorFromWindow(hwnd_, MONITOR_DEFAULTTONEAREST);
         MONITORINFO info{sizeof(info)};
         GetMonitorInfoW(monitor, &info);
+        SetWindowLongPtrW(hwnd_, GWL_STYLE, WS_POPUP | WS_VISIBLE);
+        SetWindowLongPtrW(hwnd_, GWL_EXSTYLE, WS_EX_APPWINDOW);
         SetWindowPos(
             hwnd_,
             HWND_TOP,
@@ -465,7 +478,7 @@ void ViewerWindow::ToggleFullscreen() {
             info.rcMonitor.top,
             info.rcMonitor.right - info.rcMonitor.left,
             info.rcMonitor.bottom - info.rcMonitor.top,
-            SWP_FRAMECHANGED);
+            SWP_FRAMECHANGED | SWP_NOOWNERZORDER);
         viewState_.fullscreen = true;
         renderer_.Resize(hwnd_);
         return;
@@ -475,6 +488,8 @@ void ViewerWindow::ToggleFullscreen() {
         return;
     }
 
+    SetWindowLongPtrW(hwnd_, GWL_STYLE, restoreStyle_);
+    SetWindowLongPtrW(hwnd_, GWL_EXSTYLE, restoreExStyle_);
     SetWindowPos(
         hwnd_,
         nullptr,
@@ -482,13 +497,19 @@ void ViewerWindow::ToggleFullscreen() {
         restoreRect_.top,
         restoreRect_.right - restoreRect_.left,
         restoreRect_.bottom - restoreRect_.top,
-        SWP_NOZORDER | SWP_FRAMECHANGED);
+        SWP_NOZORDER | SWP_FRAMECHANGED | SWP_NOOWNERZORDER);
+    ApplyWindowFrameStyle(hwnd_);
     viewState_.fullscreen = false;
     renderer_.Resize(hwnd_);
 }
 
 void ViewerWindow::RotateBy(int degrees) {
     viewState_.rotationDegrees = (viewState_.rotationDegrees + degrees + 360) % 360;
+}
+
+void ViewerWindow::ToggleOverlay() {
+    viewState_.overlayVisible = !viewState_.overlayVisible;
+    InvalidateRect(hwnd_, nullptr, FALSE);
 }
 
 SizeI ViewerWindow::WorkAreaForWindow() const {
