@@ -2,14 +2,13 @@
 
 #include <array>
 #include <bcrypt.h>
-#include <cstdio>
 #include <cwctype>
 #include <fstream>
 #include <iomanip>
 #include <optional>
-#include <shlobj.h>
 #include <shellapi.h>
 #include <sstream>
+#include <utility>
 #include <vector>
 #include <winhttp.h>
 
@@ -42,10 +41,46 @@ struct ScopedHash {
 struct ScopedInternetHandle {
     HINTERNET handle = nullptr;
 
+    ScopedInternetHandle() = default;
+    explicit ScopedInternetHandle(HINTERNET value) : handle(value) {}
+    ScopedInternetHandle(const ScopedInternetHandle&) = delete;
+    ScopedInternetHandle& operator=(const ScopedInternetHandle&) = delete;
+    ScopedInternetHandle(ScopedInternetHandle&& other) noexcept : handle(other.handle) {
+        other.handle = nullptr;
+    }
+    ScopedInternetHandle& operator=(ScopedInternetHandle&& other) noexcept {
+        if (this != &other) {
+            if (handle != nullptr) {
+                WinHttpCloseHandle(handle);
+            }
+            handle = other.handle;
+            other.handle = nullptr;
+        }
+        return *this;
+    }
+
     ~ScopedInternetHandle() {
         if (handle != nullptr) {
             WinHttpCloseHandle(handle);
         }
+    }
+};
+
+struct HttpRequestHandles {
+    ScopedInternetHandle session;
+    ScopedInternetHandle connection;
+    ScopedInternetHandle request;
+};
+
+struct ScopedWaitCursor {
+    HCURSOR previous = nullptr;
+
+    ScopedWaitCursor() {
+        previous = SetCursor(LoadCursorW(nullptr, IDC_WAIT));
+    }
+
+    ~ScopedWaitCursor() {
+        SetCursor(previous);
     }
 };
 
@@ -452,7 +487,7 @@ bool CrackUrl(const std::wstring& url, URL_COMPONENTS* components, std::wstring*
     return components->nScheme == INTERNET_SCHEME_HTTP || components->nScheme == INTERNET_SCHEME_HTTPS;
 }
 
-ScopedInternetHandle OpenHttpRequest(const std::wstring& url, const wchar_t* method) {
+HttpRequestHandles OpenHttpRequest(const std::wstring& url, const wchar_t* method) {
     URL_COMPONENTS components{};
     std::wstring host;
     std::wstring path;
@@ -495,9 +530,7 @@ ScopedInternetHandle OpenHttpRequest(const std::wstring& url, const wchar_t* met
         const_cast<DWORD*>(&redirectPolicy),
         sizeof(redirectPolicy));
 
-    connection.handle = nullptr;
-    session.handle = nullptr;
-    return request;
+    return {std::move(session), std::move(connection), std::move(request)};
 }
 
 bool SendHttpRequest(HINTERNET request, const wchar_t* headers) {
@@ -559,20 +592,21 @@ bool ReadHttpBytes(HINTERNET request, std::vector<unsigned char>* bytes, std::of
 }
 
 std::optional<std::wstring> HttpGetText(const wchar_t* url) {
-    ScopedInternetHandle request = OpenHttpRequest(url, L"GET");
-    if (request.handle == nullptr) {
+    HttpRequestHandles handles = OpenHttpRequest(url, L"GET");
+    if (handles.request.handle == nullptr) {
         return std::nullopt;
     }
 
     constexpr wchar_t kHeaders[] =
         L"Accept: application/vnd.github+json\r\n"
         L"User-Agent: cpictures\r\n";
-    if (!SendHttpRequest(request.handle, kHeaders) || QueryStatusCode(request.handle) != 200) {
+    if (!SendHttpRequest(handles.request.handle, kHeaders) ||
+        QueryStatusCode(handles.request.handle) != 200) {
         return std::nullopt;
     }
 
     std::vector<unsigned char> bytes;
-    if (!ReadHttpBytes(request.handle, &bytes, nullptr)) {
+    if (!ReadHttpBytes(handles.request.handle, &bytes, nullptr)) {
         return std::nullopt;
     }
 
@@ -585,17 +619,17 @@ std::optional<std::wstring> HttpGetText(const wchar_t* url) {
 }
 
 bool DownloadFile(const std::wstring& url, const std::filesystem::path& path) {
-    ScopedInternetHandle request = OpenHttpRequest(url, L"GET");
-    if (request.handle == nullptr) {
+    HttpRequestHandles handles = OpenHttpRequest(url, L"GET");
+    if (handles.request.handle == nullptr) {
         return false;
     }
 
     constexpr wchar_t kHeaders[] = L"User-Agent: cpictures\r\n";
-    if (!SendHttpRequest(request.handle, kHeaders)) {
+    if (!SendHttpRequest(handles.request.handle, kHeaders)) {
         return false;
     }
 
-    const DWORD status = QueryStatusCode(request.handle);
+    const DWORD status = QueryStatusCode(handles.request.handle);
     if (status < 200 || status >= 300) {
         return false;
     }
@@ -606,7 +640,7 @@ bool DownloadFile(const std::wstring& url, const std::filesystem::path& path) {
         return false;
     }
     std::vector<unsigned char> unused;
-    return ReadHttpBytes(request.handle, &unused, &file);
+    return ReadHttpBytes(handles.request.handle, &unused, &file);
 }
 
 std::wstring CurrentVersion() {
@@ -618,17 +652,11 @@ std::wstring CurrentVersion() {
 }
 
 std::filesystem::path UpdateDownloadPath(const std::wstring& fileName) {
-    PWSTR tempPath = nullptr;
-    std::filesystem::path directory;
-    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &tempPath)) && tempPath != nullptr) {
-        directory = std::filesystem::path(tempPath) / L"Temp" / L"cpictures-update";
-        CoTaskMemFree(tempPath);
-    } else {
-        wchar_t buffer[MAX_PATH]{};
-        const DWORD length = GetTempPathW(static_cast<DWORD>(std::size(buffer)), buffer);
-        directory = length > 0 ? std::filesystem::path(buffer) / L"cpictures-update"
-                               : std::filesystem::temp_directory_path() / L"cpictures-update";
-    }
+    wchar_t buffer[MAX_PATH]{};
+    const DWORD length = GetTempPathW(static_cast<DWORD>(std::size(buffer)), buffer);
+    const std::filesystem::path directory = length > 0
+        ? std::filesystem::path(buffer) / L"cpictures-update"
+        : std::filesystem::temp_directory_path() / L"cpictures-update";
     return directory / fileName;
 }
 
@@ -807,11 +835,7 @@ void ShowFormatSupportDialog(HWND owner) {
 }
 
 void CheckForUpdates(HWND owner) {
-    MessageBoxW(
-        owner,
-        L"\x6B63\x5728\x68C0\x67E5\x66F4\x65B0...",
-        L"cpictures",
-        MB_OK | MB_ICONINFORMATION);
+    ScopedWaitCursor waitCursor;
 
     const auto json = HttpGetText(L"https://api.github.com/repos/jeffssr/cpictures/releases/latest");
     if (!json) {
