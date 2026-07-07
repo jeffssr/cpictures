@@ -358,6 +358,9 @@ void ViewerWindow::ExecuteCommand(Command command) {
     case Command::InstallOrUpdateFormats:
         ShowFormatSupportDialog(hwnd_);
         break;
+    case Command::CheckForUpdates:
+        CheckForUpdates(hwnd_);
+        break;
     }
 
     InvalidateRect(hwnd_, nullptr, FALSE);

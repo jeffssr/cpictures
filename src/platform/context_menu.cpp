@@ -9,6 +9,7 @@ constexpr UINT kActualSize = 1005;
 constexpr UINT kFitToScreen = 1006;
 constexpr UINT kFullscreen = 1007;
 constexpr UINT kInstallFormats = 1008;
+constexpr UINT kCheckForUpdates = 1009;
 
 }  // namespace
 
@@ -26,6 +27,7 @@ std::optional<Command> ShowContextMenu(HWND owner, POINT screenPoint, bool fulls
     AppendMenuW(menu, MF_STRING, kFullscreen, FullscreenMenuText(fullscreen));
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(menu, MF_STRING, kInstallFormats, L"\x5B89\x88C5/\x66F4\x65B0\x683C\x5F0F\x652F\x6301...");
+    AppendMenuW(menu, MF_STRING, kCheckForUpdates, L"\x68C0\x67E5\x66F4\x65B0...");
 
     const UINT selected = TrackPopupMenu(
         menu,
@@ -50,6 +52,8 @@ std::optional<Command> ShowContextMenu(HWND owner, POINT screenPoint, bool fulls
         return Command::ToggleFullscreen;
     case kInstallFormats:
         return Command::InstallOrUpdateFormats;
+    case kCheckForUpdates:
+        return Command::CheckForUpdates;
     default:
         return std::nullopt;
     }
