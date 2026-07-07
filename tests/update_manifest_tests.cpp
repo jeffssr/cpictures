@@ -74,6 +74,32 @@ void TestManifestParsesUnicodeEscapes() {
                     "unicode package name");
 }
 
+void TestVersionComparison() {
+    Expect(cpictures::CompareVersions(L"v0.2.0", L"0.1.0") > 0, "v0.2.0 newer than 0.1.0");
+    Expect(cpictures::CompareVersions(L"1.10.0", L"1.2.0") > 0, "numeric version comparison");
+    Expect(cpictures::CompareVersions(L"0.1.0", L"0.1.0") == 0, "same versions compare equal");
+    Expect(!cpictures::IsNewerVersion(L"0.1.0", L"0.1.0"), "same version is not newer");
+}
+
+void TestLatestReleaseSelectsMsiAsset() {
+    const std::wstring json =
+        LR"({"tag_name":"v0.2.0","assets":[{"name":"cpictures-0.2.0-x64.zip","browser_download_url":"https://example.invalid/cpictures.zip"},{"name":"cpictures-0.2.0-x64.msi","browser_download_url":"https://example.invalid/cpictures.msi","digest":"sha256:abc","size":456}]})";
+    const cpictures::ReleaseInfo release = cpictures::ParseLatestRelease(json);
+    Expect(release.tagName == L"v0.2.0", "release tag name");
+    Expect(release.installer.name == L"cpictures-0.2.0-x64.msi", "release installer name");
+    Expect(release.installer.downloadUrl == L"https://example.invalid/cpictures.msi", "release installer url");
+    Expect(release.installer.digest == L"sha256:abc", "release installer digest");
+    Expect(release.installer.size == 456, "release installer size");
+}
+
+void TestLatestReleaseWithoutMsiReturnsEmptyInstaller() {
+    const cpictures::ReleaseInfo release = cpictures::ParseLatestRelease(
+        LR"({"tag_name":"v0.2.0","assets":[{"name":"cpictures-0.2.0-x64.zip","browser_download_url":"https://example.invalid/cpictures.zip"}]})");
+    Expect(release.tagName == L"v0.2.0", "release without msi keeps tag");
+    Expect(release.installer.name.empty(), "release without msi has no installer");
+    Expect(release.installer.downloadUrl.empty(), "release without msi has no download url");
+}
+
 void TestSha256KnownValue() {
     const std::filesystem::path path =
         std::filesystem::temp_directory_path() / L"cpictures_sha256_abc.txt";
@@ -95,6 +121,22 @@ void TestSha256MissingFileReturnsEmpty() {
     Expect(cpictures::ComputeSha256(path).empty(), "sha256 missing file");
 }
 
+void TestVerifySha256DigestAcceptsGithubDigestFormat() {
+    const std::filesystem::path path =
+        std::filesystem::temp_directory_path() / L"cpictures_sha256_digest_abc.txt";
+    {
+        std::ofstream out(path, std::ios::binary);
+        out << "abc";
+    }
+
+    Expect(cpictures::VerifySha256Digest(
+               path,
+               L"sha256:BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD"),
+           "sha256 digest accepts GitHub format");
+    Expect(!cpictures::VerifySha256Digest(path, L"sha256:0000"), "sha256 digest rejects mismatch");
+    std::filesystem::remove(path);
+}
+
 }  // namespace
 
 int main() {
@@ -102,8 +144,12 @@ int main() {
     TestManifestMissingFieldsBecomeDefaults();
     TestManifestRejectsOversizedSizeSafely();
     TestManifestParsesUnicodeEscapes();
+    TestVersionComparison();
+    TestLatestReleaseSelectsMsiAsset();
+    TestLatestReleaseWithoutMsiReturnsEmptyInstaller();
     TestSha256KnownValue();
     TestSha256MissingFileReturnsEmpty();
+    TestVerifySha256DigestAcceptsGithubDigestFormat();
     std::cout << "update manifest tests passed\n";
     return 0;
 }

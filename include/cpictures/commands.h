@@ -14,7 +14,8 @@ enum class Command {
     RotateRight,
     CopyFile,
     CopyPath,
-    InstallOrUpdateFormats
+    InstallOrUpdateFormats,
+    CheckForUpdates
 };
 
 }  // namespace cpictures
