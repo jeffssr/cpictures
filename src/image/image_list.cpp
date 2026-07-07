@@ -9,9 +9,9 @@
 namespace cpictures {
 namespace {
 
-bool IsKnownImagePath(const std::filesystem::path& path) {
+bool IsDecodableImagePath(const std::filesystem::path& path) {
     const std::wstring ext = path.extension().wstring();
-    return IsCoreSupportedExtension(ext) || IsExtensionCandidate(ext);
+    return IsCoreSupportedExtension(ext);
 }
 
 }  // namespace
@@ -21,20 +21,20 @@ ImageList ImageList::LoadFromFile(const std::filesystem::path& path) {
     const auto absolute = std::filesystem::absolute(path);
     const auto directory = absolute.parent_path();
     if (!std::filesystem::exists(absolute)) {
-        if (!IsKnownImagePath(absolute)) {
+        if (!IsDecodableImagePath(absolute)) {
             return list;
         }
         list.files_.push_back(absolute);
         return list;
     }
-    if (!IsKnownImagePath(absolute)) {
+    if (!IsDecodableImagePath(absolute)) {
         return list;
     }
     for (const auto& entry : std::filesystem::directory_iterator(directory)) {
         if (!entry.is_regular_file()) {
             continue;
         }
-        if (IsKnownImagePath(entry.path())) {
+        if (IsDecodableImagePath(entry.path())) {
             list.files_.push_back(std::filesystem::absolute(entry.path()));
         }
     }
