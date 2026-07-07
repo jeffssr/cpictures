@@ -63,7 +63,7 @@
   <Package
     Name="cpictures"
     Manufacturer="cpictures"
-    Version="0.1.0"
+    Version="0.2.0"
     UpgradeCode="0f79a0f5-865b-48c7-bcf3-328241f9eb08">
     <MajorUpgrade DowngradeErrorMessage="已安装更新版本的 cpictures。" />
     <MediaTemplate EmbedCab="yes" />
