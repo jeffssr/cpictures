@@ -86,4 +86,8 @@ bool ImageList::Empty() const {
     return files_.empty();
 }
 
+bool ImageList::CanNavigate() const {
+    return files_.size() > 1;
+}
+
 }  // namespace cpictures

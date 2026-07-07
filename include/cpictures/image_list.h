@@ -15,6 +15,7 @@ public:
     size_t Index() const;
     size_t Count() const;
     bool Empty() const;
+    bool CanNavigate() const;
 
 private:
     std::vector<std::filesystem::path> files_;

@@ -91,6 +91,19 @@ void TestImageListNaturalOrder() {
     std::filesystem::remove_all(dir);
 }
 
+void TestImageListSingleImageCannotNavigate() {
+    const auto dir = std::filesystem::temp_directory_path() / L"cpictures_single_list_test";
+    std::filesystem::remove_all(dir);
+    std::filesystem::create_directories(dir);
+    WriteTinyFile(dir / L"only.png");
+
+    cpictures::ImageList list = cpictures::ImageList::LoadFromFile(dir / L"only.png");
+    Expect(list.Count() == 1, "single image list counts one file");
+    Expect(!list.CanNavigate(), "single image list cannot navigate");
+
+    std::filesystem::remove_all(dir);
+}
+
 void TestImageListSkipsNonImageCurrentFile() {
     const auto dir = std::filesystem::temp_directory_path() / L"cpictures_list_skip_test";
     std::filesystem::remove_all(dir);
@@ -121,6 +134,7 @@ int main() {
     TestSupportedFormats();
     TestFitWindow();
     TestImageListNaturalOrder();
+    TestImageListSingleImageCannotNavigate();
     TestImageListSkipsNonImageCurrentFile();
     std::cout << "cpictures core tests passed\n";
     return 0;
