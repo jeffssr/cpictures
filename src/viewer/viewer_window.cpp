@@ -463,14 +463,10 @@ void ViewerWindow::ToggleFullscreen() {
     if (!viewState_.fullscreen) {
         GetWindowRect(hwnd_, &restoreRect_);
         hasRestoreRect_ = true;
-        restoreStyle_ = GetWindowLongPtrW(hwnd_, GWL_STYLE);
-        restoreExStyle_ = GetWindowLongPtrW(hwnd_, GWL_EXSTYLE);
 
         HMONITOR monitor = MonitorFromWindow(hwnd_, MONITOR_DEFAULTTONEAREST);
         MONITORINFO info{sizeof(info)};
         GetMonitorInfoW(monitor, &info);
-        SetWindowLongPtrW(hwnd_, GWL_STYLE, WS_POPUP | WS_VISIBLE);
-        SetWindowLongPtrW(hwnd_, GWL_EXSTYLE, WS_EX_APPWINDOW);
         SetWindowPos(
             hwnd_,
             HWND_TOP,
@@ -478,7 +474,7 @@ void ViewerWindow::ToggleFullscreen() {
             info.rcMonitor.top,
             info.rcMonitor.right - info.rcMonitor.left,
             info.rcMonitor.bottom - info.rcMonitor.top,
-            SWP_FRAMECHANGED | SWP_NOOWNERZORDER);
+            SWP_FRAMECHANGED);
         viewState_.fullscreen = true;
         renderer_.Resize(hwnd_);
         return;
@@ -488,8 +484,6 @@ void ViewerWindow::ToggleFullscreen() {
         return;
     }
 
-    SetWindowLongPtrW(hwnd_, GWL_STYLE, restoreStyle_);
-    SetWindowLongPtrW(hwnd_, GWL_EXSTYLE, restoreExStyle_);
     SetWindowPos(
         hwnd_,
         nullptr,
@@ -497,8 +491,7 @@ void ViewerWindow::ToggleFullscreen() {
         restoreRect_.top,
         restoreRect_.right - restoreRect_.left,
         restoreRect_.bottom - restoreRect_.top,
-        SWP_NOZORDER | SWP_FRAMECHANGED | SWP_NOOWNERZORDER);
-    ApplyWindowFrameStyle(hwnd_);
+        SWP_NOZORDER | SWP_FRAMECHANGED);
     viewState_.fullscreen = false;
     renderer_.Resize(hwnd_);
 }
