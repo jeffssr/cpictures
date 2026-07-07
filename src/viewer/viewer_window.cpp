@@ -121,6 +121,7 @@ int ViewerWindow::CreateAndShow(const std::filesystem::path& path) {
         return 1;
     }
     ShowWindow(hwnd_, showCommand_);
+    ResizeWindowToClientSize(ActualSizeViewport(decoded_.size, WorkAreaForWindow()), true);
     UpdateWindow(hwnd_);
 
     MSG msg{};
@@ -456,10 +457,16 @@ void ViewerWindow::ResizeWindowToClientSize(SizeI targetSize, bool centerOnMonit
     GetClientRect(hwnd_, &client);
     const int clientWidth = client.right - client.left;
     const int clientHeight = client.bottom - client.top;
+    int finalWindowWidth = targetSize.width;
+    int finalWindowHeight = targetSize.height;
     if (clientWidth != targetSize.width || clientHeight != targetSize.height) {
-        const int correctedWidth = targetSize.width + (targetSize.width - clientWidth);
-        const int correctedHeight = targetSize.height + (targetSize.height - clientHeight);
-        SetWindowPos(hwnd_, nullptr, 0, 0, correctedWidth, correctedHeight, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+        const SizeI corrected = CorrectWindowSizeForClient(
+            targetSize,
+            {clientWidth, clientHeight},
+            {targetSize.width, targetSize.height});
+        finalWindowWidth = corrected.width;
+        finalWindowHeight = corrected.height;
+        SetWindowPos(hwnd_, nullptr, 0, 0, finalWindowWidth, finalWindowHeight, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
         GetClientRect(hwnd_, &client);
     }
 
@@ -467,15 +474,13 @@ void ViewerWindow::ResizeWindowToClientSize(SizeI targetSize, bool centerOnMonit
     MONITORINFO info{sizeof(info)};
     GetMonitorInfoW(monitor, &info);
 
-    const int finalWidth = client.right - client.left;
-    const int finalHeight = client.bottom - client.top;
     const int x = centerOnMonitor
-        ? info.rcWork.left + ((info.rcWork.right - info.rcWork.left) - finalWidth) / 2
-        : oldRect.left + ((oldRect.right - oldRect.left) - finalWidth) / 2;
+        ? info.rcWork.left + ((info.rcWork.right - info.rcWork.left) - finalWindowWidth) / 2
+        : oldRect.left + ((oldRect.right - oldRect.left) - finalWindowWidth) / 2;
     const int y = centerOnMonitor
-        ? info.rcWork.top + ((info.rcWork.bottom - info.rcWork.top) - finalHeight) / 2
-        : oldRect.top + ((oldRect.bottom - oldRect.top) - finalHeight) / 2;
-    SetWindowPos(hwnd_, nullptr, x, y, finalWidth, finalHeight, SWP_NOZORDER | SWP_NOACTIVATE);
+        ? info.rcWork.top + ((info.rcWork.bottom - info.rcWork.top) - finalWindowHeight) / 2
+        : oldRect.top + ((oldRect.bottom - oldRect.top) - finalWindowHeight) / 2;
+    SetWindowPos(hwnd_, nullptr, x, y, finalWindowWidth, finalWindowHeight, SWP_NOZORDER | SWP_NOACTIVATE);
     renderer_.Resize(hwnd_);
     ClampCurrentPan();
 }

@@ -88,6 +88,11 @@ void TestFitWindow() {
     const cpictures::PointI maxPan = cpictures::ClampPanOffset({9999, 9999}, {4000, 3000}, work);
     Expect(maxPan.x == 2080, "pan x clamps to max");
     Expect(maxPan.y == 1920, "pan y clamps to max");
+
+    const cpictures::SizeI correctedWindow =
+        cpictures::CorrectWindowSizeForClient({320, 1080}, {182, 980}, {320, 1080});
+    Expect(correctedWindow.width == 458, "window width expands to preserve target client");
+    Expect(correctedWindow.height == 1180, "window height expands to preserve target client");
 }
 
 void WriteTinyFile(const std::filesystem::path& path) {

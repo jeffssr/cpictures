@@ -83,4 +83,14 @@ inline PointI ClampPanOffset(PointI pan, SizeI content, SizeI viewport) {
     return {std::clamp(pan.x, 0, maxX), std::clamp(pan.y, 0, maxY)};
 }
 
+inline SizeI CorrectWindowSizeForClient(SizeI targetClient, SizeI actualClient, SizeI currentWindow) {
+    if (!IsValid(targetClient) || !IsValid(actualClient) || !IsValid(currentWindow)) {
+        return {};
+    }
+    return {
+        std::max(1, currentWindow.width + (targetClient.width - actualClient.width)),
+        std::max(1, currentWindow.height + (targetClient.height - actualClient.height))
+    };
+}
+
 }  // namespace cpictures
