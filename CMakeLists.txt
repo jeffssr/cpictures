@@ -39,6 +39,7 @@ add_executable(cpictures WIN32
   src/image/wic_decoder.cpp
   src/platform/clipboard_service.cpp
   src/platform/context_menu.cpp
+  src/platform/dpi_awareness.cpp
   src/render/d2d_renderer.cpp
   src/update/update_manifest.cpp
   src/update/update_service.cpp

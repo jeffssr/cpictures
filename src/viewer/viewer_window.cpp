@@ -188,6 +188,19 @@ LRESULT ViewerWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) 
     case WM_SIZE:
         renderer_.Resize(hwnd_);
         return 0;
+    case WM_DPICHANGED: {
+        auto* suggested = reinterpret_cast<RECT*>(lparam);
+        SetWindowPos(
+            hwnd_,
+            nullptr,
+            suggested->left,
+            suggested->top,
+            suggested->right - suggested->left,
+            suggested->bottom - suggested->top,
+            SWP_NOZORDER | SWP_NOACTIVATE);
+        renderer_.Resize(hwnd_);
+        return 0;
+    }
     case WM_PAINT: {
         PAINTSTRUCT ps{};
         BeginPaint(hwnd_, &ps);
@@ -295,6 +308,14 @@ void ViewerWindow::ResizeWindowToClientSize(SizeI targetSize) {
     const int x = info.rcWork.left + ((info.rcWork.right - info.rcWork.left) - finalWidth) / 2;
     const int y = info.rcWork.top + ((info.rcWork.bottom - info.rcWork.top) - finalHeight) / 2;
     SetWindowPos(hwnd_, nullptr, x, y, finalWidth, finalHeight, SWP_NOZORDER | SWP_NOACTIVATE);
+    renderer_.Resize(hwnd_);
+}
+
+void ViewerWindow::ResizeWindowForCurrentZoom() {
+    if (!IsValid(decoded_.size) || viewState_.fullscreen) {
+        return;
+    }
+    ResizeWindowToClientSize(ScaleImageByZoomToWorkArea(decoded_.size, WorkAreaForWindow(), viewState_.zoom));
 }
 
 void ViewerWindow::WarmPrefetch() {
@@ -329,11 +350,13 @@ void ViewerWindow::ShowPreviousImage() {
 void ViewerWindow::ApplyZoom(double factor) {
     viewState_.fitMode = FitMode::ActualSize;
     viewState_.zoom = std::clamp(viewState_.zoom * factor, 0.05, 32.0);
+    ResizeWindowForCurrentZoom();
 }
 
 void ViewerWindow::SetActualSize() {
     viewState_.fitMode = FitMode::ActualSize;
     viewState_.zoom = 1.0;
+    ResizeWindowForCurrentZoom();
 }
 
 void ViewerWindow::SetFitToScreen() {
@@ -373,6 +396,7 @@ void ViewerWindow::ToggleFullscreen() {
             info.rcMonitor.bottom - info.rcMonitor.top,
             SWP_FRAMECHANGED);
         viewState_.fullscreen = true;
+        renderer_.Resize(hwnd_);
         return;
     }
 
@@ -389,6 +413,7 @@ void ViewerWindow::ToggleFullscreen() {
         restoreRect_.bottom - restoreRect_.top,
         SWP_NOZORDER | SWP_FRAMECHANGED);
     viewState_.fullscreen = false;
+    renderer_.Resize(hwnd_);
 }
 
 void ViewerWindow::RotateBy(int degrees) {

@@ -54,6 +54,18 @@ void TestFitWindow() {
     const cpictures::SizeI fitSmall = cpictures::ScaleImageToFitWorkArea(small, work);
     Expect(fitSmall.width == 1440, "fit-to-screen upscales small image width");
     Expect(fitSmall.height == 1080, "fit-to-screen upscales small image height");
+
+    const cpictures::SizeI zoomedIn = cpictures::ScaleImageByZoomToWorkArea(small, work, 1.25);
+    Expect(zoomedIn.width == 800, "zoom in expands window width");
+    Expect(zoomedIn.height == 600, "zoom in expands window height");
+
+    const cpictures::SizeI zoomedOut = cpictures::ScaleImageByZoomToWorkArea(small, work, 0.5);
+    Expect(zoomedOut.width == 320, "zoom out shrinks window width");
+    Expect(zoomedOut.height == 240, "zoom out shrinks window height");
+
+    const cpictures::SizeI hugeZoom = cpictures::ScaleImageByZoomToWorkArea(image, work, 2.0);
+    Expect(hugeZoom.width == 1440, "zoomed large image remains bounded width");
+    Expect(hugeZoom.height == 1080, "zoomed large image remains bounded height");
 }
 
 void WriteTinyFile(const std::filesystem::path& path) {

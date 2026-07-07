@@ -1,5 +1,6 @@
 #include "render/d2d_renderer.h"
 
+#include <cmath>
 #include <stdexcept>
 
 #include <d2d1helper.h>
@@ -55,7 +56,11 @@ void D2DRenderer::EnsureDevice(HWND hwnd) {
 
     ThrowIfFailed(
         factory_->CreateHwndRenderTarget(
-            D2D1::RenderTargetProperties(),
+            D2D1::RenderTargetProperties(
+                D2D1_RENDER_TARGET_TYPE_DEFAULT,
+                D2D1::PixelFormat(),
+                96.0f,
+                96.0f),
             D2D1::HwndRenderTargetProperties(hwnd, size),
             target_.GetAddressOf()),
         "CreateHwndRenderTarget failed");
@@ -117,6 +122,10 @@ void D2DRenderer::Render(HWND hwnd, const ViewState& state, const std::wstring& 
 
         const float drawWidth = imageSize.width * scale;
         const float drawHeight = imageSize.height * scale;
+        const bool exactPixelScale = std::fabs(scale - std::round(scale)) < 0.0001f;
+        const auto interpolation =
+            exactPixelScale ? D2D1_BITMAP_INTERPOLATION_MODE_NEAREST_NEIGHBOR
+                            : D2D1_BITMAP_INTERPOLATION_MODE_LINEAR;
         const D2D1_RECT_F destination = D2D1::RectF(
             (clientSize.width - drawWidth) * 0.5f,
             (clientSize.height - drawHeight) * 0.5f,
@@ -131,7 +140,7 @@ void D2DRenderer::Render(HWND hwnd, const ViewState& state, const std::wstring& 
             bitmap_.Get(),
             destination,
             1.0f,
-            D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
+            interpolation);
         target_->SetTransform(originalTransform);
     }
 

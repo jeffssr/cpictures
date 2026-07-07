@@ -8,6 +8,7 @@
 #include <string_view>
 
 #include "viewer/viewer_window.h"
+#include "platform/dpi_awareness.h"
 
 namespace cpictures {
 namespace {
@@ -29,6 +30,8 @@ std::filesystem::path ExtractImagePath(std::wstring_view commandLine) {
 
 int RunApplication(HINSTANCE instance, int showCommand, std::wstring_view commandLine) {
     try {
+        EnablePerMonitorDpiAwareness();
+
         const std::filesystem::path path = ExtractImagePath(commandLine);
         if (path.empty()) {
             MessageBoxW(nullptr, L"cpictures: pass an image path.", L"cpictures", MB_OK | MB_ICONINFORMATION);

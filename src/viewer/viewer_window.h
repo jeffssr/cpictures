@@ -27,6 +27,7 @@ private:
     void ExecuteCommand(Command command);
     void LoadCurrentImage();
     void ResizeWindowToClientSize(SizeI targetSize);
+    void ResizeWindowForCurrentZoom();
     void WarmPrefetch();
     void ShowNextImage();
     void ShowPreviousImage();

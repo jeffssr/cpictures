@@ -54,4 +54,15 @@ inline SizeI ScaleImageToFitWorkArea(SizeI image, SizeI workArea) {
     };
 }
 
+inline SizeI ScaleImageByZoomToWorkArea(SizeI image, SizeI workArea, double zoom) {
+    if (!IsValid(image) || !IsValid(workArea) || zoom <= 0.0) {
+        return {};
+    }
+    const SizeI zoomed{
+        std::max(1, static_cast<int>(image.width * zoom + 0.5)),
+        std::max(1, static_cast<int>(image.height * zoom + 0.5))
+    };
+    return FitImageWindow(zoomed, workArea);
+}
+
 }  // namespace cpictures
