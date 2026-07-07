@@ -34,7 +34,7 @@ D2DRenderer::D2DRenderer() {
             DWRITE_FONT_WEIGHT_NORMAL,
             DWRITE_FONT_STYLE_NORMAL,
             DWRITE_FONT_STRETCH_NORMAL,
-            12.0f,
+            16.0f,
             L"zh-CN",
             textFormat_.GetAddressOf()),
         "CreateTextFormat failed");
@@ -152,16 +152,16 @@ void D2DRenderer::Render(HWND hwnd, const ViewState& state, const std::wstring& 
                 static_cast<UINT32>(overlayText.size()),
                 textFormat_.Get(),
                 4096.0f,
-                64.0f,
+                96.0f,
                 layout.GetAddressOf()),
             "CreateTextLayout failed");
 
         DWRITE_TEXT_METRICS metrics{};
         ThrowIfFailed(layout->GetMetrics(&metrics), "GetMetrics failed");
 
-        constexpr float paddingX = 8.0f;
-        constexpr float paddingY = 5.0f;
-        constexpr float margin = 8.0f;
+        constexpr float paddingX = 10.0f;
+        constexpr float paddingY = 7.0f;
+        constexpr float margin = 10.0f;
         const float badgeWidth = metrics.width + paddingX * 2.0f;
         const float badgeHeight = metrics.height + paddingY * 2.0f;
         const D2D1_RECT_F badgeRect = D2D1::RectF(

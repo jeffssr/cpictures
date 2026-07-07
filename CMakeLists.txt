@@ -48,7 +48,7 @@ add_executable(cpictures WIN32
 target_compile_features(cpictures PRIVATE cxx_std_20)
 target_include_directories(cpictures PRIVATE include src)
 target_compile_definitions(cpictures PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
-target_link_libraries(cpictures PRIVATE cpictures_core windowscodecs d2d1 dwrite dxgi ole32 shell32 user32 gdi32 bcrypt)
+target_link_libraries(cpictures PRIVATE cpictures_core windowscodecs d2d1 dwrite dxgi ole32 shell32 user32 gdi32 dwmapi bcrypt)
 
 install(TARGETS cpictures RUNTIME DESTINATION bin)
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/docs" DESTINATION share/cpictures)

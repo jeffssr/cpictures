@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <exception>
 
+#include <dwmapi.h>
 #include <windowsx.h>
 
 #include "cpictures/overlay.h"
@@ -14,6 +15,11 @@ namespace cpictures {
 namespace {
 
 constexpr wchar_t kWindowClassName[] = L"cpictures.viewer";
+
+void ApplyWindowFrameStyle(HWND hwnd) {
+    const COLORREF borderColor = DWMWA_COLOR_DEFAULT;
+    DwmSetWindowAttribute(hwnd, DWMWA_BORDER_COLOR, &borderColor, sizeof(borderColor));
+}
 
 }  // namespace
 
@@ -47,7 +53,7 @@ int ViewerWindow::CreateAndShow(const std::filesystem::path& path) {
         WS_EX_APPWINDOW,
         kWindowClassName,
         L"cpictures",
-        WS_POPUP,
+        WS_POPUP | WS_THICKFRAME,
         CW_USEDEFAULT,
         CW_USEDEFAULT,
         960,
@@ -61,6 +67,7 @@ int ViewerWindow::CreateAndShow(const std::filesystem::path& path) {
         MessageBoxW(nullptr, L"cpictures: failed to create window.", L"cpictures", MB_OK | MB_ICONERROR);
         return 1;
     }
+    ApplyWindowFrameStyle(hwnd_);
 
     try {
         LoadCurrentImage();
@@ -106,6 +113,18 @@ LRESULT CALLBACK ViewerWindow::WindowProc(HWND hwnd, UINT message, WPARAM wparam
 
 LRESULT ViewerWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
     switch (message) {
+    case WM_NCCALCSIZE:
+        if (wparam == TRUE) {
+            return 0;
+        }
+        break;
+    case WM_NCHITTEST: {
+        const LRESULT hit = DefWindowProcW(hwnd_, message, wparam, lparam);
+        if (hit == HTCLIENT) {
+            return HTCAPTION;
+        }
+        return hit;
+    }
     case WM_KEYDOWN:
         if (wparam == VK_ESCAPE) {
             Close();
@@ -164,6 +183,13 @@ LRESULT ViewerWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) 
         viewState_.overlayVisible = !viewState_.overlayVisible;
         InvalidateRect(hwnd_, nullptr, FALSE);
         return 0;
+    case WM_NCLBUTTONUP:
+        if (wparam == HTCAPTION) {
+            viewState_.overlayVisible = !viewState_.overlayVisible;
+            InvalidateRect(hwnd_, nullptr, FALSE);
+            return 0;
+        }
+        break;
     case WM_MOUSEWHEEL: {
         const short delta = GET_WHEEL_DELTA_WPARAM(wparam);
         if ((GET_KEYSTATE_WPARAM(wparam) & MK_CONTROL) != 0) {
@@ -185,6 +211,15 @@ LRESULT ViewerWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) 
         }
         return 0;
     }
+    case WM_NCRBUTTONUP:
+        if (wparam == HTCAPTION) {
+            POINT point{GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
+            if (const auto command = ShowContextMenu(hwnd_, point)) {
+                ExecuteCommand(*command);
+            }
+            return 0;
+        }
+        break;
     case WM_SIZE:
         renderer_.Resize(hwnd_);
         return 0;
