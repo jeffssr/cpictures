@@ -28,6 +28,13 @@ private:
     void LoadCurrentImage(bool centerOnMonitor);
     void ResizeWindowToClientSize(SizeI targetSize, bool centerOnMonitor);
     void ResizeWindowForCurrentZoom();
+    void ResetPan();
+    void ClampCurrentPan();
+    void PanTo(PointI offset);
+    void PanBy(int dx, int dy);
+    bool CanPanCurrentImage() const;
+    SizeI CurrentDrawSize() const;
+    SizeI CurrentClientSize() const;
     void WarmPrefetch();
     void ShowNextImage();
     void ShowPreviousImage();
@@ -55,6 +62,9 @@ private:
     bool hasRestoreRect_ = false;
     bool leftButtonDown_ = false;
     POINT leftButtonDownPoint_{};
+    bool panningImage_ = false;
+    POINT panDragStartPoint_{};
+    PointI panDragStartOffset_{};
 };
 
 }  // namespace cpictures

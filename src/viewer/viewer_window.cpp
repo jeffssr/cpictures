@@ -170,6 +170,30 @@ LRESULT ViewerWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) 
             Close();
             return 0;
         }
+        if (wparam == VK_UP) {
+            if (CanPanCurrentImage()) {
+                const SizeI draw = CurrentDrawSize();
+                const SizeI client = CurrentClientSize();
+                if (draw.height > client.height) {
+                    PanBy(0, -96);
+                } else {
+                    PanBy(-96, 0);
+                }
+                return 0;
+            }
+        }
+        if (wparam == VK_DOWN) {
+            if (CanPanCurrentImage()) {
+                const SizeI draw = CurrentDrawSize();
+                const SizeI client = CurrentClientSize();
+                if (draw.height > client.height) {
+                    PanBy(0, 96);
+                } else {
+                    PanBy(96, 0);
+                }
+                return 0;
+            }
+        }
         if (wparam == VK_LEFT || wparam == VK_PRIOR) {
             ExecuteCommand(Command::PreviousImage);
             return 0;
@@ -220,16 +244,32 @@ LRESULT ViewerWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) 
     case WM_ERASEBKGND:
         return 1;
     case WM_LBUTTONDOWN:
+        if ((GetKeyState(VK_SHIFT) & 0x8000) != 0 && CanPanCurrentImage()) {
+            panningImage_ = true;
+            panDragStartPoint_ = {GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
+            panDragStartOffset_ = {viewState_.panX, viewState_.panY};
+            SetCapture(hwnd_);
+            SetCursor(LoadCursorW(nullptr, IDC_HAND));
+            return 0;
+        }
         leftButtonDown_ = true;
         leftButtonDownPoint_ = {GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
         SetCapture(hwnd_);
         return 0;
     case WM_LBUTTONDBLCLK:
         leftButtonDown_ = false;
+        panningImage_ = false;
         ReleaseCapture();
         KillTimer(hwnd_, kOverlayClickTimer);
         return 0;
     case WM_MOUSEMOVE:
+        if (panningImage_ && (wparam & MK_LBUTTON) != 0) {
+            const int dx = GET_X_LPARAM(lparam) - panDragStartPoint_.x;
+            const int dy = GET_Y_LPARAM(lparam) - panDragStartPoint_.y;
+            PanTo({panDragStartOffset_.x - dx, panDragStartOffset_.y - dy});
+            SetCursor(LoadCursorW(nullptr, IDC_HAND));
+            return 0;
+        }
         if (leftButtonDown_ && (wparam & MK_LBUTTON) != 0) {
             const int dx = GET_X_LPARAM(lparam) - leftButtonDownPoint_.x;
             const int dy = GET_Y_LPARAM(lparam) - leftButtonDownPoint_.y;
@@ -246,12 +286,23 @@ LRESULT ViewerWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) 
         }
         return 0;
     case WM_LBUTTONUP:
+        if (panningImage_) {
+            panningImage_ = false;
+            ReleaseCapture();
+            return 0;
+        }
         if (leftButtonDown_) {
             leftButtonDown_ = false;
             ReleaseCapture();
             SetTimer(hwnd_, kOverlayClickTimer, GetDoubleClickTime(), nullptr);
         }
         return 0;
+    case WM_SETCURSOR:
+        if ((GetKeyState(VK_SHIFT) & 0x8000) != 0 && CanPanCurrentImage()) {
+            SetCursor(LoadCursorW(nullptr, IDC_HAND));
+            return TRUE;
+        }
+        break;
     case WM_TIMER:
         if (wparam == kOverlayClickTimer) {
             KillTimer(hwnd_, kOverlayClickTimer);
@@ -282,6 +333,7 @@ LRESULT ViewerWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) 
     }
     case WM_SIZE:
         renderer_.Resize(hwnd_);
+        ClampCurrentPan();
         return 0;
     case WM_DPICHANGED: {
         auto* suggested = reinterpret_cast<RECT*>(lparam);
@@ -294,6 +346,7 @@ LRESULT ViewerWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) 
             suggested->bottom - suggested->top,
             SWP_NOZORDER | SWP_NOACTIVATE);
         renderer_.Resize(hwnd_);
+        ClampCurrentPan();
         return 0;
     }
     case WM_PAINT: {
@@ -370,8 +423,9 @@ void ViewerWindow::LoadCurrentImage(bool centerOnMonitor) {
         decoded_ = decoder_.Decode(imageList_.Current());
     }
 
+    ResetPan();
     if (centerOnMonitor) {
-        ResizeWindowToClientSize(FitImageWindow(decoded_.size, WorkAreaForWindow()), true);
+        ResizeWindowToClientSize(ActualSizeViewport(decoded_.size, WorkAreaForWindow()), true);
     } else if (viewState_.fitMode == FitMode::FitToScreen) {
         const SizeI fit = ScaleImageToFitWorkArea(decoded_.size, WorkAreaForWindow());
         if (IsValid(fit)) {
@@ -384,6 +438,7 @@ void ViewerWindow::LoadCurrentImage(bool centerOnMonitor) {
 
     renderer_.EnsureDevice(hwnd_);
     renderer_.SetImage(decoded_);
+    ClampCurrentPan();
     WarmPrefetch();
 }
 
@@ -422,13 +477,68 @@ void ViewerWindow::ResizeWindowToClientSize(SizeI targetSize, bool centerOnMonit
         : oldRect.top + ((oldRect.bottom - oldRect.top) - finalHeight) / 2;
     SetWindowPos(hwnd_, nullptr, x, y, finalWidth, finalHeight, SWP_NOZORDER | SWP_NOACTIVATE);
     renderer_.Resize(hwnd_);
+    ClampCurrentPan();
 }
 
 void ViewerWindow::ResizeWindowForCurrentZoom() {
     if (!IsValid(decoded_.size) || viewState_.fullscreen) {
         return;
     }
-    ResizeWindowToClientSize(ScaleImageByZoomToWorkArea(decoded_.size, WorkAreaForWindow(), viewState_.zoom), false);
+    const SizeI target = viewState_.zoom == 1.0
+        ? ActualSizeViewport(decoded_.size, WorkAreaForWindow())
+        : ScaleImageByZoomToWorkArea(decoded_.size, WorkAreaForWindow(), viewState_.zoom);
+    ResizeWindowToClientSize(target, false);
+}
+
+void ViewerWindow::ResetPan() {
+    viewState_.panX = 0;
+    viewState_.panY = 0;
+}
+
+void ViewerWindow::ClampCurrentPan() {
+    const PointI clamped = ClampPanOffset(
+        {viewState_.panX, viewState_.panY},
+        CurrentDrawSize(),
+        CurrentClientSize());
+    viewState_.panX = clamped.x;
+    viewState_.panY = clamped.y;
+}
+
+void ViewerWindow::PanTo(PointI offset) {
+    const PointI clamped = ClampPanOffset(offset, CurrentDrawSize(), CurrentClientSize());
+    if (viewState_.panX == clamped.x && viewState_.panY == clamped.y) {
+        return;
+    }
+    viewState_.panX = clamped.x;
+    viewState_.panY = clamped.y;
+    InvalidateRect(hwnd_, nullptr, FALSE);
+}
+
+void ViewerWindow::PanBy(int dx, int dy) {
+    PanTo({viewState_.panX + dx, viewState_.panY + dy});
+}
+
+bool ViewerWindow::CanPanCurrentImage() const {
+    return CanPan(CurrentDrawSize(), CurrentClientSize());
+}
+
+SizeI ViewerWindow::CurrentDrawSize() const {
+    if (!IsValid(decoded_.size) || viewState_.zoom <= 0.0) {
+        return {};
+    }
+    return {
+        std::max(1, static_cast<int>(decoded_.size.width * viewState_.zoom + 0.5)),
+        std::max(1, static_cast<int>(decoded_.size.height * viewState_.zoom + 0.5))
+    };
+}
+
+SizeI ViewerWindow::CurrentClientSize() const {
+    if (hwnd_ == nullptr) {
+        return {};
+    }
+    RECT client{};
+    GetClientRect(hwnd_, &client);
+    return {client.right - client.left, client.bottom - client.top};
 }
 
 void ViewerWindow::WarmPrefetch() {
@@ -465,6 +575,7 @@ void ViewerWindow::ApplyZoom(double factor) {
 void ViewerWindow::SetActualSize() {
     viewState_.fitMode = FitMode::ActualSize;
     viewState_.zoom = 1.0;
+    ResetPan();
     ResizeWindowForCurrentZoom();
 }
 
@@ -485,6 +596,7 @@ void ViewerWindow::SetFitToScreen() {
 
     viewState_.fitMode = FitMode::FitToScreen;
     viewState_.zoom = static_cast<double>(fit.width) / static_cast<double>(decoded_.size.width);
+    ResetPan();
     ResizeWindowToClientSize(fit, false);
 }
 
@@ -509,10 +621,11 @@ void ViewerWindow::ToggleFullscreen() {
             info.rcMonitor.right - info.rcMonitor.left + kFullscreenOverscan * 2,
             info.rcMonitor.bottom - info.rcMonitor.top + kFullscreenOverscan * 2,
             SWP_FRAMECHANGED);
-        ApplyFullscreenFrameStyle(hwnd_);
-        InvalidateRect(hwnd_, nullptr, FALSE);
-        renderer_.Resize(hwnd_);
-        return;
+    ApplyFullscreenFrameStyle(hwnd_);
+    InvalidateRect(hwnd_, nullptr, FALSE);
+    renderer_.Resize(hwnd_);
+    ClampCurrentPan();
+    return;
     }
 
     if (!hasRestoreRect_) {
@@ -532,6 +645,7 @@ void ViewerWindow::ToggleFullscreen() {
         SWP_NOZORDER | SWP_FRAMECHANGED);
     ApplyWindowFrameStyle(hwnd_);
     renderer_.Resize(hwnd_);
+    ClampCurrentPan();
 }
 
 void ViewerWindow::RotateBy(int degrees) {
