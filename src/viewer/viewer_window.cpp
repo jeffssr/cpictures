@@ -432,7 +432,7 @@ void ViewerWindow::ResizeWindowForCurrentZoom() {
 }
 
 void ViewerWindow::WarmPrefetch() {
-    if (imageList_.Count() < 2) {
+    if (!imageList_.CanNavigate()) {
         prefetcher_.Cancel();
         return;
     }
@@ -445,12 +445,18 @@ void ViewerWindow::WarmPrefetch() {
 }
 
 void ViewerWindow::ShowNextImage() {
+    if (!imageList_.CanNavigate()) {
+        return;
+    }
     imageList_.Next();
     viewState_.rotationDegrees = 0;
     LoadCurrentImage(false);
 }
 
 void ViewerWindow::ShowPreviousImage() {
+    if (!imageList_.CanNavigate()) {
+        return;
+    }
     imageList_.Previous();
     viewState_.rotationDegrees = 0;
     LoadCurrentImage(false);
