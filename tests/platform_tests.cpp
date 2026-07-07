@@ -1,15 +1,15 @@
 #include <cstdlib>
 #include <cstring>
+#include <cwchar>
 #include <filesystem>
 #include <iostream>
 #include <string>
-#include <utility>
-#include <vector>
 
 #include <windows.h>
 #include <shellapi.h>
 
 #include "platform/clipboard_service.h"
+#include "platform/context_menu.h"
 
 namespace {
 void Expect(bool condition, const char* message) {
@@ -29,112 +29,29 @@ bool OpenClipboardWithRetry(HWND owner) {
     return false;
 }
 
-HGLOBAL DuplicateClipboardHandle(HANDLE source) {
-    if (source == nullptr) {
-        return nullptr;
-    }
-
-    const SIZE_T size = GlobalSize(source);
-    if (size == 0) {
-        return nullptr;
-    }
-
-    const void* sourceBytes = GlobalLock(source);
-    if (sourceBytes == nullptr) {
-        return nullptr;
-    }
-
-    HGLOBAL copy = GlobalAlloc(GMEM_MOVEABLE, size);
-    if (copy == nullptr) {
-        GlobalUnlock(source);
-        return nullptr;
-    }
-
-    void* destinationBytes = GlobalLock(copy);
-    if (destinationBytes == nullptr) {
-        GlobalUnlock(source);
-        GlobalFree(copy);
-        return nullptr;
-    }
-
-    std::memcpy(destinationBytes, sourceBytes, size);
-    GlobalUnlock(copy);
-    GlobalUnlock(source);
-    return copy;
-}
-
-class ClipboardSnapshot {
+class ClipboardAccess {
 public:
-    explicit ClipboardSnapshot(HWND owner) {
+    explicit ClipboardAccess(HWND owner) {
         if (!OpenClipboardWithRetry(owner)) {
             skipReason_ = "platform tests skipped: clipboard access denied in this environment";
-            return;
+        } else {
+            CloseClipboard();
         }
-
-        for (UINT format = 0; (format = EnumClipboardFormats(format)) != 0;) {
-            HANDLE handle = GetClipboardData(format);
-            if (handle == nullptr) {
-                skipReason_ = "platform tests skipped: failed to read clipboard format";
-                CloseClipboard();
-                ClearOwnedHandles();
-                return;
-            }
-
-            HGLOBAL copy = DuplicateClipboardHandle(handle);
-            if (copy == nullptr) {
-                skipReason_ = "platform tests skipped: clipboard contains unsupported non-HGLOBAL data";
-                CloseClipboard();
-                ClearOwnedHandles();
-                return;
-            }
-
-            formats_.push_back({format, copy});
-        }
-
-        CloseClipboard();
-        restorable_ = true;
     }
 
-    ClipboardSnapshot(const ClipboardSnapshot&) = delete;
-    ClipboardSnapshot& operator=(const ClipboardSnapshot&) = delete;
-
-    ~ClipboardSnapshot() {
-        if (!restorable_) {
-            ClearOwnedHandles();
-            return;
-        }
-
+    ~ClipboardAccess() {
         if (!OpenClipboardWithRetry(nullptr)) {
-            ClearOwnedHandles();
             return;
         }
-
         EmptyClipboard();
-        for (auto& entry : formats_) {
-            if (SetClipboardData(entry.first, entry.second) != nullptr) {
-                entry.second = nullptr;
-            }
-        }
         CloseClipboard();
-        ClearOwnedHandles();
     }
 
     [[nodiscard]] bool ShouldSkip() const { return !skipReason_.empty(); }
     [[nodiscard]] const char* SkipReason() const { return skipReason_.c_str(); }
 
 private:
-    void ClearOwnedHandles() {
-        for (auto& entry : formats_) {
-            if (entry.second != nullptr) {
-                GlobalFree(entry.second);
-                entry.second = nullptr;
-            }
-        }
-    }
-
-    bool restorable_ = false;
     std::string skipReason_;
-    std::vector<std::pair<UINT, HGLOBAL>> formats_;
 };
 
 class ClipboardOwnerWindow {
@@ -185,15 +102,22 @@ void TestCopyFileToClipboard(HWND owner) {
     Expect(actual == expected, "clipboard file path matches source");
     CloseClipboard();
 }
+
+void TestFullscreenMenuText() {
+    Expect(std::wcscmp(cpictures::FullscreenMenuText(false), L"\x5168\x5C4F") == 0, "windowed menu text is fullscreen");
+    Expect(std::wcscmp(cpictures::FullscreenMenuText(true), L"\x53D6\x6D88\x5168\x5C4F") == 0, "fullscreen menu text is exit fullscreen");
+}
 }  // namespace
 
 int main() {
+    TestFullscreenMenuText();
+
     ClipboardOwnerWindow owner;
     Expect(owner.IsValid(), "clipboard owner window created");
 
-    ClipboardSnapshot snapshot(owner.handle());
-    if (snapshot.ShouldSkip()) {
-        std::cout << snapshot.SkipReason() << "\n";
+    ClipboardAccess clipboard(owner.handle());
+    if (clipboard.ShouldSkip()) {
+        std::cout << clipboard.SkipReason() << "\n";
         return 0;
     }
 

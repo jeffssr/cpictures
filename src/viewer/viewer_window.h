@@ -50,6 +50,8 @@ private:
     DecodedImage decoded_;
     D2DRenderer renderer_;
     RECT restoreRect_{};
+    LONG_PTR restoreStyle_ = 0;
+    LONG_PTR restoreExStyle_ = 0;
     bool hasRestoreRect_ = false;
     bool leftButtonDown_ = false;
     POINT leftButtonDownPoint_{};

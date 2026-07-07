@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 4.2)
-project(cpictures VERSION 0.1.0 LANGUAGES C CXX)
+project(cpictures VERSION 0.1.0 LANGUAGES C CXX RC)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -35,6 +35,7 @@ endif()
 add_executable(cpictures WIN32
   src/main.cpp
   src/app/app.cpp
+  src/app/cpictures.rc
   src/image/prefetcher.cpp
   src/image/wic_decoder.cpp
   src/platform/clipboard_service.cpp
@@ -51,6 +52,7 @@ target_compile_definitions(cpictures PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEA
 target_link_libraries(cpictures PRIVATE cpictures_core windowscodecs d2d1 dwrite dxgi ole32 shell32 user32 gdi32 dwmapi bcrypt)
 
 install(TARGETS cpictures RUNTIME DESTINATION bin)
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/assets/icon/cpictures-file.ico" DESTINATION bin)
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/docs" DESTINATION share/cpictures)
 install(DIRECTORY DESTINATION codecs)
 

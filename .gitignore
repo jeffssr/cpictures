@@ -1,0 +1,17 @@
+build/
+dist/
+release/
+.superpowers/
+
+*.user
+*.suo
+*.VC.db
+*.VC.opendb
+*.obj
+*.pdb
+*.ilk
+*.log
+*.tlog
+
+assets/icon/concepts/
+assets/icon/extracted-*.png

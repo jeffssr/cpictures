@@ -17,6 +17,7 @@ namespace {
 
 constexpr wchar_t kWindowClassName[] = L"cpictures.viewer";
 constexpr UINT_PTR kOverlayClickTimer = 1;
+constexpr int kFullscreenOverscan = 8;
 
 void ApplyWindowFrameStyle(HWND hwnd) {
     const DWMNCRENDERINGPOLICY renderingPolicy = DWMNCRP_ENABLED;
@@ -29,7 +30,36 @@ void ApplyWindowFrameStyle(HWND hwnd) {
     const COLORREF borderColor = DWMWA_COLOR_DEFAULT;
     DwmSetWindowAttribute(hwnd, DWMWA_BORDER_COLOR, &borderColor, sizeof(borderColor));
 
+    const DWM_WINDOW_CORNER_PREFERENCE cornerPreference = DWMWCP_DEFAULT;
+    DwmSetWindowAttribute(
+        hwnd,
+        DWMWA_WINDOW_CORNER_PREFERENCE,
+        &cornerPreference,
+        sizeof(cornerPreference));
+
     MARGINS margins{1, 1, 1, 1};
+    DwmExtendFrameIntoClientArea(hwnd, &margins);
+}
+
+void ApplyFullscreenFrameStyle(HWND hwnd) {
+    const DWMNCRENDERINGPOLICY renderingPolicy = DWMNCRP_DISABLED;
+    DwmSetWindowAttribute(
+        hwnd,
+        DWMWA_NCRENDERING_POLICY,
+        &renderingPolicy,
+        sizeof(renderingPolicy));
+
+    const COLORREF borderColor = DWMWA_COLOR_NONE;
+    DwmSetWindowAttribute(hwnd, DWMWA_BORDER_COLOR, &borderColor, sizeof(borderColor));
+
+    const DWM_WINDOW_CORNER_PREFERENCE cornerPreference = DWMWCP_DONOTROUND;
+    DwmSetWindowAttribute(
+        hwnd,
+        DWMWA_WINDOW_CORNER_PREFERENCE,
+        &cornerPreference,
+        sizeof(cornerPreference));
+
+    MARGINS margins{0, 0, 0, 0};
     DwmExtendFrameIntoClientArea(hwnd, &margins);
 }
 
@@ -127,7 +157,7 @@ LRESULT CALLBACK ViewerWindow::WindowProc(HWND hwnd, UINT message, WPARAM wparam
 LRESULT ViewerWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) {
     switch (message) {
     case WM_NCCALCSIZE:
-        if (wparam == TRUE) {
+        if (wparam == TRUE && !viewState_.fullscreen) {
             return 0;
         }
         break;
@@ -198,7 +228,6 @@ LRESULT ViewerWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) 
         leftButtonDown_ = false;
         ReleaseCapture();
         KillTimer(hwnd_, kOverlayClickTimer);
-        ToggleFullscreen();
         return 0;
     case WM_MOUSEMOVE:
         if (leftButtonDown_ && (wparam & MK_LBUTTON) != 0) {
@@ -246,7 +275,7 @@ LRESULT ViewerWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) 
             GetWindowRect(hwnd_, &rect);
             point = {rect.left + 24, rect.top + 24};
         }
-        if (const auto command = ShowContextMenu(hwnd_, point)) {
+        if (const auto command = ShowContextMenu(hwnd_, point, viewState_.fullscreen)) {
             ExecuteCommand(*command);
         }
         return 0;
@@ -462,20 +491,26 @@ void ViewerWindow::SetFitToScreen() {
 void ViewerWindow::ToggleFullscreen() {
     if (!viewState_.fullscreen) {
         GetWindowRect(hwnd_, &restoreRect_);
+        restoreStyle_ = GetWindowLongPtrW(hwnd_, GWL_STYLE);
+        restoreExStyle_ = GetWindowLongPtrW(hwnd_, GWL_EXSTYLE);
         hasRestoreRect_ = true;
 
         HMONITOR monitor = MonitorFromWindow(hwnd_, MONITOR_DEFAULTTONEAREST);
         MONITORINFO info{sizeof(info)};
         GetMonitorInfoW(monitor, &info);
+        viewState_.fullscreen = true;
+        SetWindowLongPtrW(hwnd_, GWL_STYLE, WS_POPUP | WS_VISIBLE);
+        SetWindowLongPtrW(hwnd_, GWL_EXSTYLE, WS_EX_APPWINDOW);
         SetWindowPos(
             hwnd_,
-            HWND_TOP,
-            info.rcMonitor.left,
-            info.rcMonitor.top,
-            info.rcMonitor.right - info.rcMonitor.left,
-            info.rcMonitor.bottom - info.rcMonitor.top,
+            HWND_TOPMOST,
+            info.rcMonitor.left - kFullscreenOverscan,
+            info.rcMonitor.top - kFullscreenOverscan,
+            info.rcMonitor.right - info.rcMonitor.left + kFullscreenOverscan * 2,
+            info.rcMonitor.bottom - info.rcMonitor.top + kFullscreenOverscan * 2,
             SWP_FRAMECHANGED);
-        viewState_.fullscreen = true;
+        ApplyFullscreenFrameStyle(hwnd_);
+        InvalidateRect(hwnd_, nullptr, FALSE);
         renderer_.Resize(hwnd_);
         return;
     }
@@ -484,15 +519,18 @@ void ViewerWindow::ToggleFullscreen() {
         return;
     }
 
+    SetWindowLongPtrW(hwnd_, GWL_STYLE, restoreStyle_);
+    SetWindowLongPtrW(hwnd_, GWL_EXSTYLE, restoreExStyle_);
+    viewState_.fullscreen = false;
     SetWindowPos(
         hwnd_,
-        nullptr,
+        HWND_NOTOPMOST,
         restoreRect_.left,
         restoreRect_.top,
         restoreRect_.right - restoreRect_.left,
         restoreRect_.bottom - restoreRect_.top,
         SWP_NOZORDER | SWP_FRAMECHANGED);
-    viewState_.fullscreen = false;
+    ApplyWindowFrameStyle(hwnd_);
     renderer_.Resize(hwnd_);
 }
 

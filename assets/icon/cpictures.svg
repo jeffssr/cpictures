@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="CPictures icon">
+  <defs>
+    <linearGradient id="bg" x1="24" y1="20" x2="232" y2="236" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#070B16"/>
+      <stop offset="1" stop-color="#151A35"/>
+    </linearGradient>
+    <linearGradient id="c" x1="58" y1="54" x2="198" y2="204" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#43E8FF"/>
+      <stop offset="1" stop-color="#A77CFF"/>
+    </linearGradient>
+    <filter id="shadow" x="-18%" y="-18%" width="136%" height="140%">
+      <feDropShadow dx="0" dy="9" stdDeviation="12" flood-color="#000000" flood-opacity="0.28"/>
+    </filter>
+  </defs>
+  <rect x="16" y="16" width="224" height="224" rx="52" fill="url(#bg)" filter="url(#shadow)"/>
+  <rect x="16.7" y="16.7" width="222.6" height="222.6" rx="51.3" fill="none" stroke="#5B6CFF" stroke-opacity="0.38" stroke-width="1.4"/>
+  <rect x="24.5" y="24.5" width="207" height="207" rx="44.5" fill="none" stroke="#FFFFFF" stroke-opacity="0.14"/>
+  <path d="M176.42 80.32A66.2 66.2 0 1 0 176.42 175.68" fill="none" stroke="url(#c)" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

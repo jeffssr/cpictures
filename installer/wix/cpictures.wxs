@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
   <Fragment>
-    <StandardDirectory Id="ProgramFilesFolder">
+    <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLFOLDER" Name="cpictures">
         <Directory Id="BinFolder" Name="bin" />
         <Directory Id="CodecsFolder" Name="codecs" />
@@ -43,25 +43,18 @@
         <RegistryValue Root="HKLM" Key="Software\Classes\Applications\cpictures.exe\SupportedTypes" Name=".heif" Value="" Type="string" />
 
         <RegistryValue Root="HKCR" Key="cpictures.image" Value="cpictures 图片" Type="string" />
+        <RegistryValue Root="HKCR" Key="cpictures.image\DefaultIcon" Value="&quot;[BinFolder]cpictures-file.ico&quot;" Type="string" />
         <RegistryValue Root="HKCR" Key="cpictures.image\shell\open\command" Value="&quot;[BinFolder]cpictures.exe&quot; &quot;%1&quot;" Type="string" />
 
-        <ProgId Id="cpictures.image" Description="cpictures 图片">
-          <Extension Id="jpg" ContentType="image/jpeg" />
-          <Extension Id="jpeg" ContentType="image/jpeg" />
-          <Extension Id="png" ContentType="image/png" />
-          <Extension Id="bmp" ContentType="image/bmp" />
-          <Extension Id="gif" ContentType="image/gif" />
-          <Extension Id="tif" ContentType="image/tiff" />
-          <Extension Id="tiff" ContentType="image/tiff" />
-          <Extension Id="webp" ContentType="image/webp" />
-          <Extension Id="heic" ContentType="image/heic" />
-          <Extension Id="heif" ContentType="image/heif" />
-        </ProgId>
+      </Component>
+
+      <Component Id="CpicturesFileIconComponent" Guid="42e9ba2d-3584-47b0-a97a-0e320c6c802f">
+        <File Id="CpicturesFileIcon" Source="$(var.SourceDir)\bin\cpictures-file.ico" KeyPath="yes" />
       </Component>
     </DirectoryRef>
 
     <DirectoryRef Id="CodecsFolder">
-      <Component Id="CpicturesCodecsFolder" Guid="*">
+      <Component Id="CpicturesCodecsFolder" Guid="1d45a3bd-0c48-49c3-9388-7746c0c725d2">
         <CreateFolder />
       </Component>
     </DirectoryRef>
@@ -77,6 +70,7 @@
 
     <Feature Id="Main" Title="cpictures" Level="1">
       <ComponentRef Id="CpicturesExecutable" />
+      <ComponentRef Id="CpicturesFileIconComponent" />
       <ComponentRef Id="CpicturesCodecsFolder" />
     </Feature>
   </Package>

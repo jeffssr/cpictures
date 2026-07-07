@@ -30,7 +30,7 @@ void TestNaturalSort() {
 
 void TestOverlayText() {
     const std::wstring text = cpictures::BuildOverlayText(L"DSC_1042.NEF", 16, 128);
-    Expect(text == L"DSC_1042.NEF  17/128", "overlay text uses one-based index");
+    Expect(text == L"17/128  DSC_1042.NEF", "overlay text puts index before file name");
 }
 
 void TestSupportedFormats() {
