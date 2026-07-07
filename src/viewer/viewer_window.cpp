@@ -1,6 +1,7 @@
 #include "viewer/viewer_window.h"
 
 #include <algorithm>
+#include <cstdlib>
 #include <exception>
 
 #include <dwmapi.h>
@@ -80,7 +81,7 @@ int ViewerWindow::CreateAndShow(const std::filesystem::path& path) {
     ApplyWindowFrameStyle(hwnd_);
 
     try {
-        LoadCurrentImage();
+        LoadCurrentImage(true);
     } catch (const std::exception&) {
         MessageBoxW(hwnd_, L"cpictures: failed to open image.", L"cpictures", MB_OK | MB_ICONERROR);
         DestroyWindow(hwnd_);
@@ -130,9 +131,6 @@ LRESULT ViewerWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) 
         break;
     case WM_NCHITTEST: {
         const LRESULT hit = DefWindowProcW(hwnd_, message, wparam, lparam);
-        if (hit == HTCLIENT) {
-            return HTCAPTION;
-        }
         return hit;
     }
     case WM_KEYDOWN:
@@ -189,17 +187,34 @@ LRESULT ViewerWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) 
         break;
     case WM_ERASEBKGND:
         return 1;
-    case WM_LBUTTONUP:
-        viewState_.overlayVisible = !viewState_.overlayVisible;
-        InvalidateRect(hwnd_, nullptr, FALSE);
+    case WM_LBUTTONDOWN:
+        leftButtonDown_ = true;
+        leftButtonDownPoint_ = {GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
+        SetCapture(hwnd_);
         return 0;
-    case WM_NCLBUTTONUP:
-        if (wparam == HTCAPTION) {
+    case WM_MOUSEMOVE:
+        if (leftButtonDown_ && (wparam & MK_LBUTTON) != 0) {
+            const int dx = GET_X_LPARAM(lparam) - leftButtonDownPoint_.x;
+            const int dy = GET_Y_LPARAM(lparam) - leftButtonDownPoint_.y;
+            const int thresholdX = GetSystemMetrics(SM_CXDRAG);
+            const int thresholdY = GetSystemMetrics(SM_CYDRAG);
+            if (std::abs(dx) >= thresholdX || std::abs(dy) >= thresholdY) {
+                leftButtonDown_ = false;
+                ReleaseCapture();
+                POINT point{};
+                GetCursorPos(&point);
+                SendMessageW(hwnd_, WM_NCLBUTTONDOWN, HTCAPTION, MAKELPARAM(point.x, point.y));
+            }
+        }
+        return 0;
+    case WM_LBUTTONUP:
+        if (leftButtonDown_) {
+            leftButtonDown_ = false;
+            ReleaseCapture();
             viewState_.overlayVisible = !viewState_.overlayVisible;
             InvalidateRect(hwnd_, nullptr, FALSE);
-            return 0;
         }
-        break;
+        return 0;
     case WM_MOUSEWHEEL: {
         const short delta = GET_WHEEL_DELTA_WPARAM(wparam);
         if ((GET_KEYSTATE_WPARAM(wparam) & MK_CONTROL) != 0) {
@@ -221,15 +236,6 @@ LRESULT ViewerWindow::HandleMessage(UINT message, WPARAM wparam, LPARAM lparam) 
         }
         return 0;
     }
-    case WM_NCRBUTTONUP:
-        if (wparam == HTCAPTION) {
-            POINT point{GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
-            if (const auto command = ShowContextMenu(hwnd_, point)) {
-                ExecuteCommand(*command);
-            }
-            return 0;
-        }
-        break;
     case WM_SIZE:
         renderer_.Resize(hwnd_);
         return 0;
@@ -313,23 +319,37 @@ void ViewerWindow::ExecuteCommand(Command command) {
     InvalidateRect(hwnd_, nullptr, FALSE);
 }
 
-void ViewerWindow::LoadCurrentImage() {
+void ViewerWindow::LoadCurrentImage(bool centerOnMonitor) {
     if (auto prefetched = prefetcher_.Take(imageList_.Current())) {
         decoded_ = std::move(*prefetched);
     } else {
         decoded_ = decoder_.Decode(imageList_.Current());
     }
 
-    ResizeWindowToClientSize(FitImageWindow(decoded_.size, WorkAreaForWindow()));
+    if (centerOnMonitor) {
+        ResizeWindowToClientSize(FitImageWindow(decoded_.size, WorkAreaForWindow()), true);
+    } else if (viewState_.fitMode == FitMode::FitToScreen) {
+        const SizeI fit = ScaleImageToFitWorkArea(decoded_.size, WorkAreaForWindow());
+        if (IsValid(fit)) {
+            viewState_.zoom = static_cast<double>(fit.width) / static_cast<double>(decoded_.size.width);
+            ResizeWindowToClientSize(fit, false);
+        }
+    } else {
+        ResizeWindowForCurrentZoom();
+    }
+
     renderer_.EnsureDevice(hwnd_);
     renderer_.SetImage(decoded_);
     WarmPrefetch();
 }
 
-void ViewerWindow::ResizeWindowToClientSize(SizeI targetSize) {
+void ViewerWindow::ResizeWindowToClientSize(SizeI targetSize, bool centerOnMonitor) {
     if (!IsValid(targetSize)) {
         return;
     }
+
+    RECT oldRect{};
+    GetWindowRect(hwnd_, &oldRect);
 
     SetWindowPos(hwnd_, nullptr, 0, 0, targetSize.width, targetSize.height, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
 
@@ -350,8 +370,12 @@ void ViewerWindow::ResizeWindowToClientSize(SizeI targetSize) {
 
     const int finalWidth = client.right - client.left;
     const int finalHeight = client.bottom - client.top;
-    const int x = info.rcWork.left + ((info.rcWork.right - info.rcWork.left) - finalWidth) / 2;
-    const int y = info.rcWork.top + ((info.rcWork.bottom - info.rcWork.top) - finalHeight) / 2;
+    const int x = centerOnMonitor
+        ? info.rcWork.left + ((info.rcWork.right - info.rcWork.left) - finalWidth) / 2
+        : oldRect.left + ((oldRect.right - oldRect.left) - finalWidth) / 2;
+    const int y = centerOnMonitor
+        ? info.rcWork.top + ((info.rcWork.bottom - info.rcWork.top) - finalHeight) / 2
+        : oldRect.top + ((oldRect.bottom - oldRect.top) - finalHeight) / 2;
     SetWindowPos(hwnd_, nullptr, x, y, finalWidth, finalHeight, SWP_NOZORDER | SWP_NOACTIVATE);
     renderer_.Resize(hwnd_);
 }
@@ -360,7 +384,7 @@ void ViewerWindow::ResizeWindowForCurrentZoom() {
     if (!IsValid(decoded_.size) || viewState_.fullscreen) {
         return;
     }
-    ResizeWindowToClientSize(ScaleImageByZoomToWorkArea(decoded_.size, WorkAreaForWindow(), viewState_.zoom));
+    ResizeWindowToClientSize(ScaleImageByZoomToWorkArea(decoded_.size, WorkAreaForWindow(), viewState_.zoom), false);
 }
 
 void ViewerWindow::WarmPrefetch() {
@@ -378,18 +402,14 @@ void ViewerWindow::WarmPrefetch() {
 
 void ViewerWindow::ShowNextImage() {
     imageList_.Next();
-    viewState_.zoom = 1.0;
     viewState_.rotationDegrees = 0;
-    viewState_.fitMode = FitMode::ActualSize;
-    LoadCurrentImage();
+    LoadCurrentImage(false);
 }
 
 void ViewerWindow::ShowPreviousImage() {
     imageList_.Previous();
-    viewState_.zoom = 1.0;
     viewState_.rotationDegrees = 0;
-    viewState_.fitMode = FitMode::ActualSize;
-    LoadCurrentImage();
+    LoadCurrentImage(false);
 }
 
 void ViewerWindow::ApplyZoom(double factor) {
@@ -421,7 +441,7 @@ void ViewerWindow::SetFitToScreen() {
 
     viewState_.fitMode = FitMode::FitToScreen;
     viewState_.zoom = static_cast<double>(fit.width) / static_cast<double>(decoded_.size.width);
-    ResizeWindowToClientSize(fit);
+    ResizeWindowToClientSize(fit, false);
 }
 
 void ViewerWindow::ToggleFullscreen() {

@@ -25,8 +25,8 @@ private:
     LRESULT HandleMessage(UINT message, WPARAM wparam, LPARAM lparam);
     void Close();
     void ExecuteCommand(Command command);
-    void LoadCurrentImage();
-    void ResizeWindowToClientSize(SizeI targetSize);
+    void LoadCurrentImage(bool centerOnMonitor);
+    void ResizeWindowToClientSize(SizeI targetSize, bool centerOnMonitor);
     void ResizeWindowForCurrentZoom();
     void WarmPrefetch();
     void ShowNextImage();
@@ -50,6 +50,8 @@ private:
     D2DRenderer renderer_;
     RECT restoreRect_{};
     bool hasRestoreRect_ = false;
+    bool leftButtonDown_ = false;
+    POINT leftButtonDownPoint_{};
 };
 
 }  // namespace cpictures
