@@ -7,6 +7,9 @@
         <Directory Id="CodecsFolder" Name="codecs" />
       </Directory>
     </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationProgramsFolder" Name="cpictures" />
+    </StandardDirectory>
 
     <DirectoryRef Id="BinFolder">
       <Component Id="CpicturesExecutable" Guid="*">
@@ -17,6 +20,7 @@
 
         <RegistryValue Root="HKLM" Key="Software\cpictures\Capabilities" Name="ApplicationName" Value="cpictures" Type="string" />
         <RegistryValue Root="HKLM" Key="Software\cpictures\Capabilities" Name="ApplicationDescription" Value="极简图片查看器" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\cpictures\Capabilities" Name="ApplicationIcon" Value="&quot;[BinFolder]cpictures.exe&quot;,0" Type="string" />
 
         <RegistryValue Root="HKLM" Key="Software\cpictures\Capabilities\FileAssociations" Name=".jpg" Value="cpictures.image" Type="string" />
         <RegistryValue Root="HKLM" Key="Software\cpictures\Capabilities\FileAssociations" Name=".jpeg" Value="cpictures.image" Type="string" />
@@ -31,6 +35,12 @@
 
         <RegistryValue Root="HKLM" Key="Software\RegisteredApplications" Name="cpictures" Value="Software\cpictures\Capabilities" Type="string" />
 
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\cpictures.exe" Name="FriendlyAppName" Value="cpictures" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\cpictures.exe" Name="ApplicationCompany" Value="cpictures" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\cpictures.exe" Name="ApplicationName" Value="cpictures" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\cpictures.exe" Name="ApplicationDescription" Value="极简图片查看器" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\cpictures.exe\DefaultIcon" Value="&quot;[BinFolder]cpictures.exe&quot;,0" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\Applications\cpictures.exe\shell\open\command" Value="&quot;[BinFolder]cpictures.exe&quot; &quot;%1&quot;" Type="string" />
         <RegistryValue Root="HKLM" Key="Software\Classes\Applications\cpictures.exe\SupportedTypes" Name=".jpg" Value="" Type="string" />
         <RegistryValue Root="HKLM" Key="Software\Classes\Applications\cpictures.exe\SupportedTypes" Name=".jpeg" Value="" Type="string" />
         <RegistryValue Root="HKLM" Key="Software\Classes\Applications\cpictures.exe\SupportedTypes" Name=".png" Value="" Type="string" />
@@ -42,6 +52,17 @@
         <RegistryValue Root="HKLM" Key="Software\Classes\Applications\cpictures.exe\SupportedTypes" Name=".heic" Value="" Type="string" />
         <RegistryValue Root="HKLM" Key="Software\Classes\Applications\cpictures.exe\SupportedTypes" Name=".heif" Value="" Type="string" />
 
+        <RegistryValue Root="HKLM" Key="Software\Classes\.jpg\OpenWithProgids" Name="cpictures.image" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\.jpeg\OpenWithProgids" Name="cpictures.image" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\.png\OpenWithProgids" Name="cpictures.image" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\.bmp\OpenWithProgids" Name="cpictures.image" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\.gif\OpenWithProgids" Name="cpictures.image" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\.tif\OpenWithProgids" Name="cpictures.image" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\.tiff\OpenWithProgids" Name="cpictures.image" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\.webp\OpenWithProgids" Name="cpictures.image" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\.heic\OpenWithProgids" Name="cpictures.image" Value="" Type="string" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\.heif\OpenWithProgids" Name="cpictures.image" Value="" Type="string" />
+
         <RegistryValue Root="HKCR" Key="cpictures.image" Value="cpictures 图片" Type="string" />
         <RegistryValue Root="HKCR" Key="cpictures.image\DefaultIcon" Value="&quot;[BinFolder]cpictures-file.ico&quot;" Type="string" />
         <RegistryValue Root="HKCR" Key="cpictures.image\shell\open\command" Value="&quot;[BinFolder]cpictures.exe&quot; &quot;%1&quot;" Type="string" />
@@ -50,6 +71,19 @@
 
       <Component Id="CpicturesFileIconComponent" Guid="42e9ba2d-3584-47b0-a97a-0e320c6c802f">
         <File Id="CpicturesFileIcon" Source="$(var.SourceDir)\bin\cpictures-file.ico" KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="ApplicationProgramsFolder">
+      <Component Id="CpicturesStartMenuShortcut" Guid="9fb52ff2-fd0e-4b91-b560-64896288cebf">
+        <Shortcut
+          Id="CpicturesStartMenuShortcut"
+          Name="cpictures"
+          Description="极简图片查看器"
+          Target="[BinFolder]cpictures.exe"
+          WorkingDirectory="BinFolder" />
+        <RemoveFolder Id="RemoveApplicationProgramsFolder" On="uninstall" />
+        <RegistryValue Root="HKCU" Key="Software\cpictures" Name="StartMenuShortcut" Value="1" Type="integer" KeyPath="yes" />
       </Component>
     </DirectoryRef>
 
@@ -63,7 +97,7 @@
   <Package
     Name="cpictures"
     Manufacturer="cpictures"
-    Version="0.2.0"
+    Version="0.2.1"
     UpgradeCode="0f79a0f5-865b-48c7-bcf3-328241f9eb08">
     <MajorUpgrade DowngradeErrorMessage="已安装更新版本的 cpictures。" />
     <MediaTemplate EmbedCab="yes" />
@@ -71,6 +105,7 @@
     <Feature Id="Main" Title="cpictures" Level="1">
       <ComponentRef Id="CpicturesExecutable" />
       <ComponentRef Id="CpicturesFileIconComponent" />
+      <ComponentRef Id="CpicturesStartMenuShortcut" />
       <ComponentRef Id="CpicturesCodecsFolder" />
     </Feature>
   </Package>
